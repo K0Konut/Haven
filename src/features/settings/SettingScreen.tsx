@@ -22,7 +22,7 @@ export default function SettingsScreen() {
   });
   const [status, setStatus] = useState<string | null>(null);
 
-  const phoneOk = useMemo(() => contact.email.trim().length > 0, [contact.email]);
+const emailOk = useMemo(() => contact.email.trim().length > 0, [contact.email]);
 
   useEffect(() => {
     (async () => {
@@ -119,7 +119,7 @@ async function handleTestEmail() {
 
         <button
           onClick={handleTestEmail}
-          disabled={!phoneOk}
+          disabled={!emailOk}
           className="w-full rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-2 text-sm text-sky-200 hover:bg-sky-500/15 disabled:opacity-50"
         >
           Tester l’alerte email

@@ -1,3 +1,9 @@
+/**
+ * @deprecated Ce service est déprécié.
+ * Utilisez email.ts et la fonction sendEmergencyEmail() à la place.
+ * Le SMS a été remplacé par l'envoi automatique d'email via EmailJS.
+ */
+
 import type { LatLng } from "../../types/routing";
 import type { EmergencyContact } from "./contact";
 
@@ -23,5 +29,5 @@ export async function openEmergencySms(params: {
   const { contact, currentLocation } = params;
 
   const body = `${contact.message}${locationBlock(currentLocation)}`;
-  window.location.href = smsUrl(contact.phone, body);
+  window.location.href = smsUrl(contact.email, body);
 }

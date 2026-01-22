@@ -78,7 +78,7 @@ export default function FallDetectionPanel() {
           <div>
             <div className="text-sm font-semibold text-zinc-100">Détection de chute</div>
             <div className="text-xs text-zinc-400">
-              Impact + immobilité • ouvre un SMS vers le contact d’urgence
+              Impact + immobilité • envoie un email au contact d’urgence
             </div>
             {!contactOk && (
               <div className="mt-1 text-xs text-amber-300">
@@ -114,7 +114,7 @@ export default function FallDetectionPanel() {
           <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950 p-5 space-y-3">
             <div className="text-lg font-bold text-zinc-100">Chute détectée</div>
             <div className="text-sm text-zinc-300">
-              Ouverture du SMS dans{" "}
+              Envoi de l'email dans{" "}
               <span className="font-bold text-sky-300">{countdownSec}s</span>
             </div>
             <div className="text-xs text-zinc-400">Si tout va bien, annule maintenant.</div>

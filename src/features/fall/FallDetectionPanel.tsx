@@ -3,7 +3,7 @@ import { requestMotionPermission } from "../../services/permissions/motion";
 import { useFallStore } from "../../store/fall.slice";
 import { useFallDetection } from "./useFallDetection";
 import { loadEmergencyContact } from "../../services/emergency/contact";
-import { openEmergencySms } from "../../services/emergency/sms";
+import { sendEmergencyEmail } from "../../services/emergency/email";
 import { useLocationStore } from "../../store/location.slice";
 
 export default function FallDetectionPanel() {
@@ -25,7 +25,7 @@ export default function FallDetectionPanel() {
   useEffect(() => {
     (async () => {
       const c = await loadEmergencyContact();
-      setContactOk(!!c?.phone);
+      setContactOk(!!c?.email);
     })();
   }, []);
 
@@ -42,11 +42,11 @@ export default function FallDetectionPanel() {
 
       try {
         const c = await loadEmergencyContact();
-        if (!c?.phone) {
+        if (!c?.email) {
           alert("Aucun contact d’urgence configuré (Réglages).");
           return;
         }
-        await openEmergencySms({ contact: c, currentLocation: fix ?? null });
+        await sendEmergencyEmail({ contact: c, currentLocation: fix ?? null });
       } finally {
         // allow again for future detections
         setTimeout(() => (sendingRef.current = false), 1500);
@@ -62,8 +62,8 @@ export default function FallDetectionPanel() {
         return;
       }
       const c = await loadEmergencyContact();
-      setContactOk(!!c?.phone);
-      if (!c?.phone) {
+      setContactOk(!!c?.email);
+      if (!c?.email) {
         alert("Configure un contact d’urgence dans Réglages avant d’activer.");
         return;
       }

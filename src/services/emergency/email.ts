@@ -8,4 +8,12 @@ export async function sendEmergencyEmail(params: {
   currentLocation?: LatLng | null;
 }): Promise<void> {
   // TODO: implement email sending
+const { contact, currentLocation } = params;
+
+ let locationText = "";
+  if (currentLocation) {
+    const mapsLink = `https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`;
+    locationText = `\n\nPosition GPS: ${currentLocation.lat}, ${currentLocation.lng}\nVoir sur Google Maps: ${mapsLink}`;
+  }
+
 }

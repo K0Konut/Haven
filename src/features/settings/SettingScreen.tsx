@@ -82,11 +82,11 @@ async function handleTestEmail() {
         <div className="text-sm font-semibold text-zinc-100">Contact d’urgence</div>
 
         <label className="block space-y-1">
-          <span className="text-xs text-zinc-400">Téléphone</span>
+          <span className="text-xs text-zinc-400">Email</span>
           <input
             value={contact.email}
-            onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
-            placeholder="+33612345678"
+            onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+            placeholder="exemple@email.com"
             className="w-full rounded-xl border border-zinc-800 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-500/60"
           />
         </label>

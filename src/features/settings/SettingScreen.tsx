@@ -128,7 +128,7 @@ async function handleTestEmail() {
         {status && <div className="text-xs text-zinc-300">{status}</div>}
 
         <p className="text-xs text-zinc-500">
-          L’alerte ouvre l’app SMS avec un message pré-rempli + ta position (si dispo).
+          L'alerte envoie automatiquement un email avec ta position (si dispo).
         </p>
 
         <div className="text-[11px] text-zinc-500">

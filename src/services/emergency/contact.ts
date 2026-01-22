@@ -5,7 +5,7 @@ export type EmergencyContact = {
   message: string; // texte de base
 };
 
-const KEY = "softride.emergencyContact.v1";
+const KEY = "softride.emergencyContact.v2";
 
 export async function loadEmergencyContact(): Promise<EmergencyContact | null> {
   const { value } = await Preferences.get({ key: KEY });

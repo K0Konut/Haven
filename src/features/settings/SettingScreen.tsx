@@ -7,7 +7,7 @@ import {
   clearEmergencyContact,
   type EmergencyContact,
 } from "../../services/emergency/contact";
-import { openEmergencySms } from "../../services/emergency/sms";
+import { sendEmergencyEmail } from "../../services/emergency/email";
 import { useLocationStore } from "../../store/location.slice";
 
 const DEFAULT_MSG =
@@ -17,12 +17,12 @@ export default function SettingsScreen() {
   const fix = useLocationStore((s) => s.fix);
 
   const [contact, setContact] = useState<EmergencyContact>({
-    phone: "",
+    email: "",
     message: DEFAULT_MSG,
   });
   const [status, setStatus] = useState<string | null>(null);
 
-  const phoneOk = useMemo(() => contact.phone.trim().length > 0, [contact.phone]);
+  const phoneOk = useMemo(() => contact.email.trim().length > 0, [contact.email]);
 
   useEffect(() => {
     (async () => {
@@ -33,12 +33,12 @@ export default function SettingsScreen() {
 
   async function handleSave() {
     setStatus(null);
-    if (!contact.phone.trim()) {
+    if (!contact.email.trim()) {
       setStatus("⚠️ Renseigne un numéro de téléphone.");
       return;
     }
     await saveEmergencyContact({
-      phone: contact.phone.trim(),
+      email: contact.email.trim(),
       message: contact.message?.trim() || DEFAULT_MSG,
     });
     setStatus("✅ Contact enregistré.");
@@ -46,15 +46,15 @@ export default function SettingsScreen() {
 
   async function handleClear() {
     await clearEmergencyContact();
-    setContact({ phone: "", message: DEFAULT_MSG });
+    setContact({ email: "", message: DEFAULT_MSG });
     setStatus("✅ Contact supprimé.");
   }
 
-  async function handleTestSms() {
+async function handleTestEmail() {
     setStatus(null);
-    const phone = contact.phone.trim();
-    if (!phone) {
-      setStatus("⚠️ Renseigne un numéro avant de tester.");
+    const email = contact.email.trim();
+    if (!email) {
+      setStatus("⚠️ Renseigne une adresse email avant de tester.");
       return;
     }
 
@@ -62,8 +62,8 @@ export default function SettingsScreen() {
       (contact.message?.trim() || DEFAULT_MSG) +
       "\n\n✅ Test SoftRide : ceci est un message de test (pas une vraie alerte).";
 
-    await openEmergencySms({
-      contact: { phone, message: msg },
+    await sendEmergencyEmail({
+      contact: { email, message: msg },
       currentLocation: fix ?? null,
     });
   }
@@ -84,7 +84,7 @@ export default function SettingsScreen() {
         <label className="block space-y-1">
           <span className="text-xs text-zinc-400">Téléphone</span>
           <input
-            value={contact.phone}
+            value={contact.email}
             onChange={(e) => setContact((c) => ({ ...c, phone: e.target.value }))}
             placeholder="+33612345678"
             className="w-full rounded-xl border border-zinc-800 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-500/60"
@@ -118,11 +118,11 @@ export default function SettingsScreen() {
         </div>
 
         <button
-          onClick={handleTestSms}
+          onClick={handleTestEmail}
           disabled={!phoneOk}
           className="w-full rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-2 text-sm text-sky-200 hover:bg-sky-500/15 disabled:opacity-50"
         >
-          Tester l’alerte SMS
+          Tester l’alerte email
         </button>
 
         {status && <div className="text-xs text-zinc-300">{status}</div>}

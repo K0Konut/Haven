@@ -16,4 +16,18 @@ const { contact, currentLocation } = params;
     locationText = `\n\nPosition GPS: ${currentLocation.lat}, ${currentLocation.lng}\nVoir sur Google Maps: ${mapsLink}`;
   }
 
+  const fullMessage = contact.message + locationText;
+
+  const templateParams = {
+    to_email: contact.email,
+    message: fullMessage,
+  };
+
+  await emailjs.send(
+    emailjsConfig.serviceId,
+    emailjsConfig.templateId,
+    templateParams,
+    emailjsConfig.publicKey
+  );
+
 }

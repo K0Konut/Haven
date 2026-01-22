@@ -34,7 +34,7 @@ const emailOk = useMemo(() => contact.email.trim().length > 0, [contact.email]);
   async function handleSave() {
     setStatus(null);
     if (!contact.email.trim()) {
-      setStatus("⚠️ Renseigne un numéro de téléphone.");
+      setStatus("⚠️ Renseigne une adresse email.");
       return;
     }
     await saveEmergencyContact({

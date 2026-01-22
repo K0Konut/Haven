@@ -62,11 +62,18 @@ async function handleTestEmail() {
       (contact.message?.trim() || DEFAULT_MSG) +
       "\n\n✅ Test SoftRide : ceci est un message de test (pas une vraie alerte).";
 
-    await sendEmergencyEmail({
-      contact: { email, message: msg },
-      currentLocation: fix ?? null,
-    });
+    try {
+      await sendEmergencyEmail({
+        contact: { email, message: msg },
+        currentLocation: fix ?? null,
+      });
+      setStatus("✅ Email envoyé avec succès !");
+    } catch (error) {
+      console.error("Erreur envoi email:", error);
+      setStatus("❌ Erreur lors de l'envoi. Vérifie la console (F12).");
+    }
   }
+
 
   return (
     <div className="space-y-4">

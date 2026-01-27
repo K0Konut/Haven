@@ -17,12 +17,22 @@ export default function Home() {
        <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-3">
         <div className="text-sm font-semibold text-zinc-100">📊 Vos statistiques</div>
         <div className="grid grid-cols-3 gap-3">
+  <div className="rounded-xl border border-zinc-800 bg-black/30 p-3 text-center">
+    <div className="text-lg font-bold text-zinc-100">12.5</div>
+    <div className="text-xs text-zinc-400">km</div>
+  </div>
+  <div className="rounded-xl border border-zinc-800 bg-black/30 p-3 text-center">
+    <div className="text-lg font-bold text-zinc-100">45</div>
+    <div className="text-xs text-zinc-400">min</div>
+  </div>
+</div>
+
         <div className="rounded-xl border border-zinc-800 bg-black/30 p-3 text-center">
         <div className="text-lg font-bold text-zinc-100">12.5</div>
         <div className="text-xs text-zinc-400">km</div>
        </div>
         </div>
-      </div>
+
     </section>
   );
 }

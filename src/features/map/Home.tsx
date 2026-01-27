@@ -14,6 +14,11 @@ export default function Home() {
       >
         🚴 Nouvelle balade
       </button>
+       <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-3">
+        <div className="text-sm font-semibold text-zinc-100">📊 Vos statistiques</div>
+        <div className="grid grid-cols-3 gap-3">
+        </div>
+      </div>
     </section>
   );
 }

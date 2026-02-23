@@ -143,12 +143,6 @@ export default function Home() {
             <div className="text-sm font-semibold text-zinc-100">🆘 Contact d’urgence</div>
             <div className="text-xs text-zinc-400">Envoie un email d’alerte avec ta position</div>
           </div>
-          <button
-            onClick={() => navigate("/settings")}
-            className="rounded-xl border border-zinc-800 bg-transparent px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
-          >
-            Modifier
-          </button>
         </div>
 
         <div className="rounded-xl border border-zinc-800 bg-black/30 p-3">

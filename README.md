@@ -1,94 +1,164 @@
-<h1 align="center">SOFTRIDE</h1>
+# SoftRide
 
-<p align="center">
-  <em>Empowering seamless, safe, and accelerated journeys.</em>
-</p>
+Application de navigation velo cross-platform (web + mobile via Capacitor), avec:
+- calcul d'itineraires securises (Mapbox Directions + scoring),
+- guidage temps reel avec reroutage automatique,
+- detection de chute basee capteurs (accelerometre/gyroscope),
+- envoi d'alerte email au contact d'urgence (EmailJS).
 
-<p align="center">
-  <img alt="last commit" src="https://img.shields.io/github/last-commit/K0Konut/Softride?style=for-the-badge">
-  <img alt="TypeScript" src="https://img.shields.io/github/languages/top/K0Konut/Softride?style=for-the-badge&label=typescript">
-  <img alt="languages" src="https://img.shields.io/github/languages/count/K0Konut/Softride?style=for-the-badge&label=languages">
-</p>
+## Table des matieres
+- [1. Stack technique](#1-stack-technique)
+- [2. Prerequis](#2-prerequis)
+- [3. Installation](#3-installation)
+- [4. Variables d'environnement](#4-variables-denvironnement)
+- [5. Commandes utiles](#5-commandes-utiles)
+- [6. Lancer sur mobile (Capacitor)](#6-lancer-sur-mobile-capacitor)
+- [7. Architecture rapide](#7-architecture-rapide)
+- [8. Flux fonctionnels](#8-flux-fonctionnels)
+- [9. Persistance locale](#9-persistance-locale)
+- [10. Documentation detaillee](#10-documentation-detaillee)
+- [11. Depannage rapide](#11-depannage-rapide)
 
-<p align="center">
-  Built with the tools and technologies:
-</p>
+## 1. Stack technique
+- React 19 + TypeScript + Vite
+- Tailwind CSS v4
+- Zustand (etat applicatif)
+- Mapbox GL JS + APIs Directions/Geocoding
+- Capacitor (Android, iOS)
+- Plugins Capacitor: Geolocation, Motion, Haptics, Local Notifications, Preferences
+- EmailJS pour les alertes email d'urgence
 
-<p align="center">
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
-  <img alt="React" src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" />
-  <img alt="Vite" src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" />
-  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />
-  <img alt="Capacitor" src="https://img.shields.io/badge/Capacitor-119EFF?style=for-the-badge&logo=capacitor&logoColor=white" />
-  <img alt="Mapbox" src="https://img.shields.io/badge/Mapbox-000000?style=for-the-badge&logo=mapbox&logoColor=white" />
-  <img alt="GitHub Actions" src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white" />
-  <img alt="ESLint" src="https://img.shields.io/badge/ESLint-4B32C3?style=for-the-badge&logo=eslint&logoColor=white" />
-</p>
+## 2. Prerequis
+- Node.js 20+ (recommande)
+- npm 10+ (ou equivalent adapte)
+- Compte Mapbox (token API)
+- Compte EmailJS (service/template/public key)
+- Pour mobile:
+  - Android Studio pour Android
+  - Xcode pour iOS (macOS)
 
----
+## 3. Installation
+```bash
+git clone <url-du-repo>
+cd Haven
+npm install
+cp .env.example .env
+```
 
-## Table of Contents
+Ensuite, complete les variables `.env` puis lance:
+```bash
+npm run dev
+```
 
-- [Overview](#overview)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Usage](#usage)
-  - [Testing](#testing)
+## 4. Variables d'environnement
+Fichier: `.env`
 
----
+```bash
+VITE_MAPBOX_TOKEN=...
+VITE_EMAILJS_SERVICE_ID=...
+VITE_EMAILJS_TEMPLATE_ID=...
+VITE_EMAILJS_PUBLIC_KEY=...
+```
 
-## Overview
+Details:
+- `VITE_MAPBOX_TOKEN`: requis pour la carte, geocoding et directions.
+- `VITE_EMAILJS_*`: requis pour l'envoi d'email d'urgence.
 
-SoftRide is a navigation-focused application that helps build and run **high-performance, cross-platform bike navigation** experiences.  
-It combines a modern React + TypeScript front end with native mobile capabilities via Capacitor, Mapbox routing, and safety-oriented features such as fall detection.
+Si `VITE_MAPBOX_TOKEN` est absent, l'app leve une erreur au chargement de la carte.
 
-### Why SoftRide?
+## 5. Commandes utiles
+```bash
+npm run dev         # demarrage local
+npm run build       # build production (tsc + vite)
+npm run preview     # preview du build
+npm run lint        # eslint
+npm run typecheck   # verification TypeScript
+```
 
-SoftRide aims to make it easier to develop **responsive, safety-aware navigation apps** with real-time location and routing.  
-Some of the core ideas are:
+## 6. Lancer sur mobile (Capacitor)
+```bash
+npm run cap:sync
+npm run cap:open:android
+npm run cap:open:ios
+```
 
-- 🎯 **Modular Architecture**  
-  Clearly separated features (map, routing, navigation, fall detection) with Zustand stores and services to keep the project scalable and maintainable.
+Config Capacitor: `capacitor.config.ts`
+- `appId`: `com.softride.app`
+- `webDir`: `dist`
 
-- 🚀 **Fast Development**  
-  Vite, React, TypeScript, and Tailwind CSS provide a fast feedback loop and a strongly typed, modern frontend stack.
+## 7. Architecture rapide
+```text
+src/
+  app/
+    config/           # env + config EmailJS
+    layout/           # shell + navigation basse
+    routes/           # routing React Router (hash router)
+  features/
+    map/              # ecran carte/navigation + composants UI
+    fall/             # detection de chute + debug/calibration
+    settings/         # reglages (contact urgence, capteurs)
+  services/
+    mapbox/           # directions + geocoding + client HTTP
+    routing/          # geodesie, scoring, formatage
+    permissions/      # geoloc + motion permissions
+    emergency/        # contact + email + legacy SMS (deprecie)
+    navigation/       # persistance session de nav
+  store/
+    *.slice.ts        # stores Zustand (location/routing/nav/fall)
+```
 
-- 🗺️ **Geospatial & Routing Utilities**  
-  Deep integration with Mapbox APIs for bike-friendly routing, alternative paths, geocoding, and route geometry helpers (snap to route, distance to route, ETA, etc.).
+## 8. Flux fonctionnels
+### Calcul d'itineraire
+1. L'utilisateur choisit une destination (geocoding Mapbox).
+2. `routing.calculate()` appelle `getSecureRoute()`.
+3. Les routes candidates sont scorees (`scoreCandidates`) et triees.
+4. La meilleure route est selectionnee, les autres restent en alternatives visuelles.
 
-- 🛡️ **Safety & Emergency Features**  
-  Includes primitives for fall detection, countdown before alert, haptics, and local notifications to enhance rider safety.
+### Navigation temps reel
+1. `watchPosition()` ecoute les fixes GPS.
+2. Le fix est "snappe" sur la polyline (`distanceToRouteMeters`).
+3. L'app met a jour:
+   - distance restante,
+   - ETA,
+   - prochaine instruction,
+   - etat off-route.
+4. Si off-route stable + GPS suffisamment bon, reroute automatique.
+5. Session de navigation sauvegardee/restauree automatiquement (TTL 45 min).
 
-- 📱 **Cross-Platform Support**  
-  Runs as a web app and can be bundled to Android/iOS using Capacitor, bridging web code with native capabilities (GPS, haptics, notifications).
+### Detection de chute
+1. Lecture des capteurs via `@capacitor/motion`.
+2. `FallEngine` detecte:
+   - chute libre,
+   - impact,
+   - immobilite post-impact.
+3. En cas de confirmation:
+   - countdown utilisateur (annuler ou envoyer immediatement),
+   - envoi email au contact d'urgence via EmailJS.
 
-- 🧰 **Developer Friendly**  
-  Comes with ESLint, TypeScript strictness, GitHub Actions (lint / typecheck / build), and debug utilities (GPS quality pill, fall debug panel) to keep the app stable as it grows.
+## 9. Persistance locale
+- Contact d'urgence:
+  - stockage via Capacitor Preferences
+  - cle: `softride.emergencyContact.v2`
+- Session navigation:
+  - stockage localStorage
+  - cle: `softride_nav_session_v1`
+  - expiration: 45 minutes
 
----
+## 10. Documentation detaillee
+Voir `docs/ARCHITECTURE.md` pour:
+- details par module/store/service,
+- logique de scoring d'itineraires,
+- fonctionnement du moteur de chute,
+- recommandations d'extension.
 
-## Getting Started
-
-### Prerequisites
-
-This project assumes you have the following installed:
-
-- **Programming Language:** TypeScript (via Node.js toolchain)
-- **Runtime:** Node.js (LTS recommended)
-- **Package Manager:** `npm` (ou `pnpm`/`yarn` si tu adaptes les commandes)
-- **Mobile tooling (optionnel mais recommandé) :**
-  - Android Studio (AVD) pour tester sur Android
-  - Xcode / simulators pour tester sur iOS (si tu es sur macOS)
-- **Mapbox account:** une clé d’API Mapbox valide pour la carte, le routing et le geocoding.
-
----
-
-### Installation
-
-Build SoftRide from source and install dependencies.
-
-1. **Clone the repository :**
-
-   ```bash
-   git clone https://github.com/K0Konut/Softride.git
+## 11. Depannage rapide
+- Carte non chargee:
+  - verifier `VITE_MAPBOX_TOKEN` dans `.env`.
+- Recherche d'adresse vide ou en erreur:
+  - verifier connectivite + token Mapbox.
+- Alerte email non envoyee:
+  - verifier les 3 variables `VITE_EMAILJS_*`.
+- Detection de chute inactive:
+  - verifier permissions capteurs + contact d'urgence configure.
+- GPS peu fiable:
+  - l'app affiche une pastille qualite GPS, attendre une meilleure precision avant navigation.

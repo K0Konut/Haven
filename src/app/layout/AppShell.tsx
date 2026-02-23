@@ -1,4 +1,11 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useEffect } from "react";
+import {
+  ensureLocationPermission,
+  getCurrentPosition,
+  watchPosition,
+} from "../../services/permissions/location";
+import { useLocationStore } from "../../store/location.slice";
 
 const linkBase =
   "flex flex-col items-center justify-center gap-1 px-3 py-2 text-xs";
@@ -15,6 +22,41 @@ export default function AppShell() {
     height: navHeight,
     "--bottom-nav-h": navHeight,
   };
+
+  // Global location acquisition: request permission and fetch a first fix
+  // so pages like Home can read `useLocationStore().fix` even if Map wasn't opened.
+  const setPermission = useLocationStore((s) => s.setPermission);
+  const setFix = useLocationStore((s) => s.setFix);
+
+  useEffect(() => {
+    let stopWatch: (() => void) | null = null;
+    (async () => {
+      try {
+        const perm = await ensureLocationPermission();
+        setPermission(perm);
+        try {
+          const pos = await getCurrentPosition();
+          setFix(pos);
+        } catch (e) {
+          // ignore initial getCurrentPosition failures
+        }
+
+        stopWatch = watchPosition((newFix) => {
+          setFix(newFix);
+        }, (err) => {
+          // ignore watch errors for now
+          // console.error('watchPosition error', err);
+        });
+      } catch (e) {
+        // no-op
+      }
+    })();
+
+    return () => {
+      if (stopWatch) stopWatch();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="h-[100dvh] w-full bg-zinc-950 text-zinc-100 overflow-hidden flex flex-col">

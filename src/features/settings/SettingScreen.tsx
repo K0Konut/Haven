@@ -70,7 +70,8 @@ async function handleTestEmail() {
       setStatus("✅ Email envoyé avec succès !");
     } catch (error) {
       console.error("Erreur envoi email:", error);
-      setStatus("❌ Erreur lors de l'envoi. Vérifie la console (F12).");
+      const msg = error instanceof Error ? error.message : String(error);
+      setStatus(`❌ Erreur lors de l'envoi: ${msg}`);
     }
   }
 

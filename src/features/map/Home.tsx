@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  loadEmergencyContact,
+  loadEmergencyContacts,
   type EmergencyContact,
 } from "../../services/emergency/contact";
 import { sendEmergencyEmail } from "../../services/emergency/email";
@@ -11,28 +11,38 @@ export default function Home() {
   const navigate = useNavigate();
   const fix = useLocationStore((s) => s.fix);
 
-  const [contact, setContact] = useState<EmergencyContact | null>(null);
+  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const c = await loadEmergencyContact();
-      if (c) setContact(c);
+      const c = await loadEmergencyContacts();
+      setContacts(c);
     })();
   }, []);
 
   async function handleSos() {
     setStatus(null);
-    if (!contact) {
-      setStatus("⚠️ Aucun contact d'urgence configuré. Définis-le dans Réglages.");
+    if (!contacts || contacts.length === 0) {
+      setStatus("⚠️ Aucun contact d'urgence configuré. Définis-les dans Réglages.");
       return;
     }
 
     setLoading(true);
     try {
-      await sendEmergencyEmail({ contact, currentLocation: fix ?? null });
-      setStatus("✅ SOS envoyé (email).");
+      let sent = 0;
+      let failed = 0;
+      for (const ct of contacts) {
+        try {
+          await sendEmergencyEmail({ contact: ct, currentLocation: fix ?? null });
+          sent++;
+        } catch (err) {
+          console.error("sendEmergencyEmail failed for", ct, err);
+          failed++;
+        }
+      }
+      setStatus(`✅ Envoyé: ${sent}, Échecs: ${failed}`);
     } catch (e) {
       console.error(e);
       setStatus("❌ Erreur envoi SOS. Vérifie la configuration.");
@@ -71,20 +81,22 @@ export default function Home() {
         </div>
 
         <div className="rounded-xl border border-zinc-800 bg-black/30 p-3">
-          {contact ? (
+          {contacts && contacts.length > 0 ? (
             <div className="space-y-1">
-              <div className="text-sm text-zinc-100">{contact.email}</div>
-              <div className="text-xs text-zinc-400">{contact.message}</div>
+              {contacts.slice(0, 3).map((c, i) => (
+                <div key={i} className="text-sm text-zinc-100">{c.name ? c.name : c.email}</div>
+              ))}
+              {contacts.length > 3 && <div className="text-xs text-zinc-400">+{contacts.length - 3} autres</div>}
             </div>
           ) : (
-            <div className="text-xs text-zinc-400">Aucun contact enregistré — configure-le dans Réglages.</div>
+            <div className="text-xs text-zinc-400">Aucun contact enregistré — configure-les dans Réglages.</div>
           )}
         </div>
 
         <div className="flex gap-2">
           <button
             onClick={handleSos}
-            disabled={!contact || loading}
+            disabled={( !contacts || contacts.length === 0 ) || loading}
             className="flex-1 rounded-xl border border-rose-600 bg-rose-600/10 px-4 py-3 text-sm font-semibold text-rose-200 hover:bg-rose-600/20 disabled:opacity-50"
           >
             🔴 SOS — Envoyer alerte

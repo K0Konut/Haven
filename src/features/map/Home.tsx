@@ -45,7 +45,6 @@ export default function Home() {
     const fav = await loadFavorites();
     setFavorites(fav);
   }
-
   // address autocomplete (debounced)
   useEffect(() => {
     if (!showAddressPanel) return;
@@ -71,33 +70,27 @@ export default function Home() {
 
   async function handleStartFavorite(f: Favorite) {
     // persist a nav session and navigate to map where MapScreen restores it
-    saveNavSession({ version: 1, savedAt: Date.now(), destination: { label: f.label, center: f.center } });
+    // use the stored address as the searchable label if available
+    saveNavSession({
+      version: 1,
+      savedAt: Date.now(),
+      destination: { label: f.address ? f.address : f.label, center: f.center },
+    });
     navigate("/map");
   }
 
-  async function handleAddCurrentFavorite() {
-    if (!fix) {
-      setFavStatus("⚠️ Position inconnue — attends un fix GPS.");
-      return;
-    }
-    const label = window.prompt("Nom du favori (ex: Maison, Travail)", "");
-    if (!label) return;
-    const fav: Favorite = {
-      id: `fav_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
-      label: label.trim(),
-      center: fix,
-      category: "other",
-    };
-    await addOrUpdateFavorite(fav);
-    await refreshFavorites();
-    setFavStatus("✅ Favori ajouté.");
-  }
+  // removed: adding favorite by current position is no longer supported
 
   async function handleRemoveFavorite(id: string) {
-    if (!confirm("Supprimer ce favori ?")) return;
-    await removeFavorite(id);
-    await refreshFavorites();
-    setFavStatus("✅ Favori supprimé.");
+    // delete without browser confirm popup (immediate)
+    try {
+      await removeFavorite(id);
+      await refreshFavorites();
+      setFavStatus("✅ Favori supprimé.");
+    } catch (e) {
+      console.error(e);
+      setFavStatus("❌ Impossible de supprimer le favori.");
+    }
   }
 
   async function handleSos() {
@@ -199,12 +192,6 @@ export default function Home() {
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold text-zinc-100">⭐ Favoris</div>
           <div className="flex gap-2">
-            <button
-              onClick={handleAddCurrentFavorite}
-              className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-200 hover:bg-sky-500/15"
-            >
-              + Position actuelle
-            </button>
             <button
               onClick={() => {
                 setShowAddressPanel((s) => !s);

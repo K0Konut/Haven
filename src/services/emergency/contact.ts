@@ -1,18 +1,18 @@
 import { Preferences } from "@capacitor/preferences";
 
 export type EmergencyContact = {
-  phone: string;   // ex: +33612345678
+  email: string;   // ex: +33612345678
   message: string; // texte de base
 };
 
-const KEY = "softride.emergencyContact.v1";
+const KEY = "softride.emergencyContact.v2";
 
 export async function loadEmergencyContact(): Promise<EmergencyContact | null> {
   const { value } = await Preferences.get({ key: KEY });
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as EmergencyContact;
-    if (!parsed?.phone) return null;
+    if (!parsed?.email) return null;
     return parsed;
   } catch {
     return null;

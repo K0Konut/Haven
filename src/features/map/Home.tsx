@@ -4,6 +4,15 @@ import {
   loadEmergencyContacts,
   type EmergencyContact,
 } from "../../services/emergency/contact";
+import { geocodeForward } from "../../services/mapbox/geocoding";
+import MapView from "./MapView";
+import {
+  loadFavorites,
+  addOrUpdateFavorite,
+  removeFavorite,
+  type Favorite,
+} from "../../services/favorites";
+import { saveNavSession } from "../../services/navigation/persistence";
 import { sendEmergencyEmail } from "../../services/emergency/email";
 import { useLocationStore } from "../../store/location.slice";
 
@@ -12,20 +21,89 @@ export default function Home() {
   const fix = useLocationStore((s) => s.fix);
 
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
-  const [status, setStatus] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [showAddressPanel, setShowAddressPanel] = useState(false);
+  const [addressQuery, setAddressQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
+  const [favName, setFavName] = useState("");
+  const [favStatus, setFavStatus] = useState<string | null>(null);
+  const [emergencyStatus, setEmergencyStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
       const c = await loadEmergencyContacts();
       setContacts(c);
+      const fav = await loadFavorites();
+      setFavorites(fav);
     })();
   }, []);
 
+  async function refreshFavorites() {
+    const fav = await loadFavorites();
+    setFavorites(fav);
+  }
+
+  // address autocomplete (debounced)
+  useEffect(() => {
+    if (!showAddressPanel) return;
+    if (!addressQuery || addressQuery.trim().length < 3) {
+      setSuggestions([]);
+      setSuggestionsLoading(false);
+      return;
+    }
+    setSuggestionsLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await geocodeForward(addressQuery.trim(), fix ?? undefined);
+        setSuggestions(res ?? []);
+      } catch (e) {
+        console.error("geocodeForward failed", e);
+        setSuggestions([]);
+      } finally {
+        setSuggestionsLoading(false);
+      }
+    }, 420);
+    return () => clearTimeout(t);
+  }, [addressQuery, showAddressPanel, fix]);
+
+  async function handleStartFavorite(f: Favorite) {
+    // persist a nav session and navigate to map where MapScreen restores it
+    saveNavSession({ version: 1, savedAt: Date.now(), destination: { label: f.label, center: f.center } });
+    navigate("/map");
+  }
+
+  async function handleAddCurrentFavorite() {
+    if (!fix) {
+      setFavStatus("⚠️ Position inconnue — attends un fix GPS.");
+      return;
+    }
+    const label = window.prompt("Nom du favori (ex: Maison, Travail)", "");
+    if (!label) return;
+    const fav: Favorite = {
+      id: `fav_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+      label: label.trim(),
+      center: fix,
+      category: "other",
+    };
+    await addOrUpdateFavorite(fav);
+    await refreshFavorites();
+    setFavStatus("✅ Favori ajouté.");
+  }
+
+  async function handleRemoveFavorite(id: string) {
+    if (!confirm("Supprimer ce favori ?")) return;
+    await removeFavorite(id);
+    await refreshFavorites();
+    setFavStatus("✅ Favori supprimé.");
+  }
+
   async function handleSos() {
-    setStatus(null);
+    setEmergencyStatus(null);
     if (!contacts || contacts.length === 0) {
-      setStatus("⚠️ Aucun contact d'urgence configuré. Définis-les dans Réglages.");
+      setEmergencyStatus("⚠️ Aucun contact d'urgence configuré. Définis-les dans Réglages.");
       return;
     }
 
@@ -42,10 +120,10 @@ export default function Home() {
           failed++;
         }
       }
-      setStatus(`✅ Envoyé: ${sent}, Échecs: ${failed}`);
+      setEmergencyStatus(`✅ Envoyé: ${sent}, Échecs: ${failed}`);
     } catch (e) {
       console.error(e);
-      setStatus("❌ Erreur envoi SOS. Vérifie la configuration.");
+      setEmergencyStatus("❌ Erreur envoi SOS. Vérifie la configuration.");
     } finally {
       setLoading(false);
     }
@@ -110,7 +188,7 @@ export default function Home() {
           </button>
         </div>
 
-        {status && <div className="text-xs text-zinc-300">{status}</div>}
+        {emergencyStatus && <div className="text-xs text-zinc-300">{emergencyStatus}</div>}
 
         <div className="text-[11px] text-zinc-500">
           Position actuelle : <span className="text-zinc-300">{fix ? `${fix.lat.toFixed(5)}, ${fix.lng.toFixed(5)}` : "—"}</span>
@@ -118,6 +196,145 @@ export default function Home() {
       </div>
 
       <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-semibold text-zinc-100">⭐ Favoris</div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleAddCurrentFavorite}
+              className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-200 hover:bg-sky-500/15"
+            >
+              + Position actuelle
+            </button>
+            <button
+              onClick={() => {
+                setShowAddressPanel((s) => !s);
+                setAddressQuery("");
+                setSuggestions([]);
+                setSelectedPlace(null);
+                setFavName("");
+                setFavStatus(null);
+              }}
+              className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-200 hover:bg-sky-500/15"
+            >
+              + Par adresse
+            </button>
+          </div>
+        </div>
+
+        {showAddressPanel && (
+          <div className="space-y-2">
+            <div>
+              <label className="text-xs text-zinc-400">Adresse</label>
+              <input
+                value={addressQuery}
+                onChange={(e) => setAddressQuery(e.target.value)}
+                placeholder="Tape l'adresse ou le lieu"
+                className="mt-1 w-full rounded-md bg-black/20 border border-zinc-800 px-3 py-2 text-sm text-zinc-100"
+              />
+              <div className="relative">
+                {suggestionsLoading && <div className="text-xs text-zinc-400 mt-1">Recherche...</div>}
+                {suggestions.length > 0 && (
+                  <ul className="absolute z-20 mt-1 max-h-44 w-full overflow-auto rounded-md border border-zinc-800 bg-zinc-950/80 p-1 text-sm">
+                    {suggestions.map((s, i) => (
+                      <li
+                        key={i}
+                        onClick={() => {
+                          setSelectedPlace(s);
+                          setAddressQuery(s.label);
+                          setFavName(s.label);
+                          setSuggestions([]);
+                        }}
+                        className="cursor-pointer px-2 py-1 hover:bg-zinc-800"
+                      >
+                        <div className="text-sm text-zinc-100">{s.label}</div>
+                        <div className="text-xs text-zinc-400">{s.context ?? ""}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-zinc-400">Nom du favori</label>
+              <input
+                value={favName}
+                onChange={(e) => setFavName(e.target.value)}
+                placeholder="Ex: Maison, Travail"
+                className="mt-1 w-full rounded-md bg-black/20 border border-zinc-800 px-3 py-2 text-sm text-zinc-100"
+              />
+            </div>
+
+            <div className="h-40 rounded-md overflow-hidden border border-zinc-800">
+              <MapView center={selectedPlace ? selectedPlace.center : fix ?? { lat: 48.8566, lng: 2.3522 }} zoom={14} destination={selectedPlace ? selectedPlace.center : null} />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  if (!selectedPlace) return setFavStatus("⚠️ Choisis d'abord une adresse dans la liste.");
+                  if (!favName || !favName.trim()) return setFavStatus("⚠️ Donne un nom pour le favori.");
+                  const fav = {
+                    id: `fav_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+                    label: favName.trim(),
+                    address: selectedPlace.label,
+                    center: selectedPlace.center,
+                    category: "other",
+                  } as Favorite;
+                  try {
+                    await addOrUpdateFavorite(fav);
+                    await refreshFavorites();
+                    setFavStatus("✅ Favori ajouté.");
+                    setShowAddressPanel(false);
+                    setAddressQuery("");
+                    setSelectedPlace(null);
+                    setFavName("");
+                  } catch (e) {
+                    console.error(e);
+                    setFavStatus("❌ Impossible d'ajouter le favori.");
+                  }
+                }}
+                className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-200 hover:bg-sky-500/15"
+              >
+                Ajouter
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowAddressPanel(false);
+                  setAddressQuery("");
+                  setSuggestions([]);
+                  setSelectedPlace(null);
+                  setFavName("");
+                }}
+                className="rounded-xl border border-zinc-800 bg-transparent px-3 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-3 gap-3">
+          {favorites.length === 0 && (
+            <div className="col-span-3 text-xs text-zinc-400">Aucun favori — ajoute ta maison, travail ou autres.</div>
+          )}
+          {favorites.map((f) => (
+            <div key={f.id} className="rounded-xl border border-zinc-800 bg-black/30 p-3 text-center">
+              <div className="text-base font-bold text-zinc-100">{f.label}</div>
+              <div className="text-xs text-zinc-400 mt-1">{f.address ? f.address : `${f.center.lat.toFixed(4)}, ${f.center.lng.toFixed(4)}`}</div>
+              <div className="mt-2 flex items-center justify-center gap-2">
+                <button onClick={() => handleStartFavorite(f)} className="rounded-md px-2 py-1 bg-sky-600/10 text-xs text-sky-200 border border-sky-700">Démarrer</button>
+                <button onClick={() => handleRemoveFavorite(f.id)} className="rounded-md px-2 py-1 bg-rose-700/5 text-xs text-rose-300 border border-rose-700">Suppr</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <hr className="border-zinc-800/40" />
+
+        {favStatus && <div className="text-xs text-zinc-300">{favStatus}</div>}
+
         <div className="text-sm font-semibold text-zinc-100">📊 Vos statistiques</div>
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl border border-zinc-800 bg-black/30 p-3 text-center">

@@ -23,7 +23,22 @@ export async function loadEmergencyContacts(): Promise<EmergencyContact[]> {
   if (raw) {
     try {
       const parsed = JSON.parse(raw) as EmergencyContact[];
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        // ensure every contact has an id (migrate legacy entries)
+        let mutated = false;
+        const mapped = parsed.map((c) => {
+          if (!c.id) {
+            mutated = true;
+            return { ...c, id: `ec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}` } as EmergencyContact;
+          }
+          return c;
+        });
+        if (mutated) {
+          // persist migration
+          await Preferences.set({ key: KEY, value: JSON.stringify(mapped) });
+        }
+        return mapped;
+      }
     } catch {
       // ignore
     }

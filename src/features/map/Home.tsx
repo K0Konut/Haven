@@ -228,7 +228,7 @@ export default function Home() {
                         onClick={() => {
                           setSelectedPlace(s);
                           setAddressQuery(s.label);
-                          setFavName(s.label);
+                          // do NOT auto-fill the favorite name; let the user enter a custom name
                           setSuggestions([]);
                         }}
                         className="cursor-pointer px-2 py-1 hover:bg-zinc-800"

@@ -21,7 +21,7 @@
     "@capacitor/haptics": "^7.0.2",
     "@capacitor/ios": "^7.4.4",
     "@capacitor/local-notifications": "^7.0.3",
-    "@capacitor/motion": "^7.0.1",
+    "@capacitor/motion": "^7.0.2",
     "@capacitor/preferences": "^7.0.2",
     "@emailjs/browser": "^4.4.1",
     "mapbox-gl": "^3.16.0",

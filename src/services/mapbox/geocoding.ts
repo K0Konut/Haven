@@ -28,6 +28,8 @@ export async function geocodeForward(query: string, proximity?: LatLng): Promise
     limit: "6",
     autocomplete: "true",
     types: "address,place,poi",
+    country:"fr",
+    bbox: "-5.142,41.333,9.560,51.124",
   };
 
   if (proximity) params.proximity = `${proximity.lng},${proximity.lat}`;

@@ -238,6 +238,12 @@ export default function MapScreen() {
     stopWatchRef.current?.();
     stopWatchRef.current = null;
 
+    if (navStartAtRef.current != null && selected) {
+      const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
+      const traveled = Math.max(0, selected.summary.distanceMeters - (remainingDistance ?? selected.summary.distanceMeters));
+      useStatsStore.getState().addRide(traveled, elapsedSec);
+    }
+
     nav.stop();
 
     // reset feedback guards
@@ -260,7 +266,7 @@ export default function MapScreen() {
 
     // reset zoom doux
     setMapZoom(16);
-  }, [nav]);
+  }, [nav, selected, remainingDistance]);
 
   function clearDestination() {
     stopNavigation();
@@ -484,17 +490,18 @@ export default function MapScreen() {
 
       // Arrivé
       if (rem < 25) {
-  if (navStartAtRef.current != null) {
-    const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
-    setNavActualDurationSec(elapsedSec);
-    if (selected) {
-      useStatsStore.getState().addRide(selected.summary.distanceMeters, elapsedSec);
-    }
-  }
-  setHasArrived(true);
-  stopNavigation();
-  return;
-}
+        if (navStartAtRef.current != null) {
+          const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
+          setNavActualDurationSec(elapsedSec);
+          if (selected) {
+            useStatsStore.getState().addRide(selected.summary.distanceMeters, elapsedSec);
+          }
+          navStartAtRef.current = null;
+        }
+        setHasArrived(true);
+        stopNavigation();
+        return;
+      }
 
       // Reroute (stable + accuracy)
       const ACC_OK = accGps < GPS_MAX_ACC_FOR_REROUTE;

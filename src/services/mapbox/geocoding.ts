@@ -25,11 +25,10 @@ export async function geocodeForward(query: string, proximity?: LatLng): Promise
   const params: Record<string, string> = {
     access_token: token,
     language: "fr",
-    limit: "6",
+    limit: "8",
     autocomplete: "true",
     types: "poi,address,locality,neighborhood,place",
     country:"fr",
-    bbox: "-5.142,41.333,9.560,51.124",
     fuzzyMatch: "true",
   };
    

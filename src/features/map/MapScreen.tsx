@@ -20,8 +20,6 @@ import {
 import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { loadNavSession, saveNavSession } from "../../services/navigation/persistence";
-import { useStatsStore } from "../../store/stats.slice";
-
 
 type SelectedDestination = { label: string; center: LatLng };
 
@@ -238,12 +236,6 @@ export default function MapScreen() {
     stopWatchRef.current?.();
     stopWatchRef.current = null;
 
-    if (navStartAtRef.current != null && selected) {
-      const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
-      const traveled = Math.max(0, selected.summary.distanceMeters - (remainingDistance ?? selected.summary.distanceMeters));
-      useStatsStore.getState().addRide(traveled, elapsedSec);
-    }
-
     nav.stop();
 
     // reset feedback guards
@@ -266,7 +258,7 @@ export default function MapScreen() {
 
     // reset zoom doux
     setMapZoom(16);
-  }, [nav, selected, remainingDistance]);
+  }, [nav]);
 
   function clearDestination() {
     stopNavigation();
@@ -493,12 +485,9 @@ export default function MapScreen() {
         if (navStartAtRef.current != null) {
           const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
           setNavActualDurationSec(elapsedSec);
-          if (selected) {
-            useStatsStore.getState().addRide(selected.summary.distanceMeters, elapsedSec);
-          }
-          navStartAtRef.current = null;
         }
         setHasArrived(true);
+
         stopNavigation();
         return;
       }
@@ -627,7 +616,7 @@ export default function MapScreen() {
       </div>
 
       {/* TOP OVERLAY */}
-       <div className="absolute left-0 right-0 top-0 z-40 p-3 pt-4 space-y-2">
+<div className="absolute left-0 right-0 top-0 z-40 p-3 pt-4 space-y-2">
         <div className="mx-auto max-w-xl space-y-2">
           {/* Toast de reprise de navigation */}
           {resumeBannerLabel && (

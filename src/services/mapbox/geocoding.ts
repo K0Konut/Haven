@@ -27,10 +27,10 @@ export async function geocodeForward(query: string, proximity?: LatLng): Promise
     language: "fr",
     limit: "6",
     autocomplete: "true",
-    types: "address,place,poi,neighborhood,locality,place",
+    types: "poi,address,locality,neighborhood,place",
     country:"fr",
     bbox: "-5.142,41.333,9.560,51.124",
-    fuzzyMatch: "false",
+    fuzzyMatch: "true",
   };
    
   if (proximity) {

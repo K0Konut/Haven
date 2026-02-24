@@ -627,7 +627,7 @@ export default function MapScreen() {
       </div>
 
       {/* TOP OVERLAY */}
-      <div className="absolute left-0 right-0 top-0 z-10 p-3 pt-4 space-y-2">
+       <div className="absolute left-0 right-0 top-0 z-40 p-3 pt-4 space-y-2">
         <div className="mx-auto max-w-xl space-y-2">
           {/* Toast de reprise de navigation */}
           {resumeBannerLabel && (

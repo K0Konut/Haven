@@ -1,13 +1,37 @@
 import { useNavigate } from "react-router-dom";
+import { useStatsStore } from "../../store/stats.slice";
+
+function formatLastRide(lastRide: { date: string; distanceMeters: number; durationSec: number } | null) {
+  if (!lastRide) return null;
+  const date = new Date(lastRide.date);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  let label = date.toLocaleDateString("fr-FR");
+  if (date.toDateString() === today.toDateString()) label = "Aujourd'hui";
+  else if (date.toDateString() === yesterday.toDateString()) label = "Hier";
+
+  const km = (lastRide.distanceMeters / 1000).toFixed(1);
+  const min = Math.round(lastRide.durationSec / 60);
+  return `${label} • ${km} km • ${min} min`;
+}
 
 export default function Home() {
   const navigate = useNavigate();
+  const { totalDistanceMeters, totalDurationSec, totalRides, lastRide } = useStatsStore();
+
+  const totalKm = (totalDistanceMeters / 1000).toFixed(1);
+  const totalMin = Math.round(totalDurationSec / 60);
+  const lastRideLabel = formatLastRide(lastRide);
+
   return (
     <section className="space-y-4">
       <header>
         <h2 className="text-2xl font-bold">👋 Bonjour !</h2>
         <p className="text-sm text-zinc-400">Prêt pour une balade ?</p>
       </header>
+
       <button
         onClick={() => navigate("/map")}
         className="w-full rounded-2xl px-4 py-4 text-sm font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
@@ -23,19 +47,26 @@ export default function Home() {
         <div className="text-sm font-semibold text-purple-200">📊 Vos statistiques</div>
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(109, 40, 217, 0.2)', border: '1px solid rgba(168, 85, 247, 0.25)' }}>
-            <div className="text-lg font-bold text-white">12.5</div>
+            <div className="text-lg font-bold text-white">{totalKm}</div>
             <div className="text-xs text-purple-300">km</div>
           </div>
           <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(109, 40, 217, 0.2)', border: '1px solid rgba(168, 85, 247, 0.25)' }}>
-            <div className="text-lg font-bold text-white">45</div>
+            <div className="text-lg font-bold text-white">{totalMin}</div>
             <div className="text-xs text-purple-300">min</div>
           </div>
           <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(109, 40, 217, 0.2)', border: '1px solid rgba(168, 85, 247, 0.25)' }}>
-            <div className="text-lg font-bold text-white">3</div>
+            <div className="text-lg font-bold text-white">{totalRides}</div>
             <div className="text-xs text-purple-300">balades</div>
           </div>
         </div>
       </div>
+
+      {lastRideLabel && (
+        <div className="rounded-2xl p-4 space-y-2" style={{ background: 'rgba(88, 28, 135, 0.15)', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
+          <div className="text-sm font-semibold text-purple-200">🕐 Dernière balade</div>
+          <div className="text-sm text-zinc-300">{lastRideLabel}</div>
+        </div>
+      )}
     </section>
   );
 }

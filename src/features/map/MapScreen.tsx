@@ -20,6 +20,8 @@ import {
 import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { loadNavSession, saveNavSession } from "../../services/navigation/persistence";
+import { useStatsStore } from "../../store/stats.slice";
+
 
 type SelectedDestination = { label: string; center: LatLng };
 
@@ -482,15 +484,17 @@ export default function MapScreen() {
 
       // Arrivé
       if (rem < 25) {
-        if (navStartAtRef.current != null) {
-          const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
-          setNavActualDurationSec(elapsedSec);
-        }
-        setHasArrived(true);
-
-        stopNavigation();
-        return;
-      }
+  if (navStartAtRef.current != null) {
+    const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
+    setNavActualDurationSec(elapsedSec);
+    if (selected) {
+      useStatsStore.getState().addRide(selected.summary.distanceMeters, elapsedSec);
+    }
+  }
+  setHasArrived(true);
+  stopNavigation();
+  return;
+}
 
       // Reroute (stable + accuracy)
       const ACC_OK = accGps < GPS_MAX_ACC_FOR_REROUTE;

@@ -27,7 +27,7 @@ export async function geocodeForward(query: string, proximity?: LatLng): Promise
     language: "fr",
     limit: "6",
     autocomplete: "true",
-    types: "address,place,poi, neighborhood,locality,place",
+    types: "address,place,poi,neighborhood,locality,place",
     country:"fr",
     bbox: "-5.142,41.333,9.560,51.124",
     fuzzyMatch: "false",

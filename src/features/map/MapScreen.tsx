@@ -12,6 +12,10 @@ import NavBanner from "./components/NavBanner";
 import { formatDistance, formatDuration } from "../../services/routing/format";
 import { geocodeForward, type PlaceResult } from "../../services/mapbox/geocoding";
 import type { LatLng } from "../../types/routing";
+import type { Hazard, ParkingSpot } from "../../types/map";
+import { fetchHazards } from "../../services/map/hazards";
+import { fetchParkingSpots } from "../../services/map/parking";
+import { useOverlayStore } from "../../store/overlay.slice";
 import {
   distanceToRouteMeters,
   remainingRouteDistanceMeters,
@@ -66,10 +70,20 @@ export default function MapScreen() {
   // UX toggles
   const [autoRouting, setAutoRouting] = useState(true);
 
+  // extras visibility (global store)
+  const showHazards = useOverlayStore((s) => s.showHazards);
+  const showParkings = useOverlayStore((s) => s.showParkings);
+  const toggleHazards = useOverlayStore((s) => s.toggleHazards);
+  const toggleParkings = useOverlayStore((s) => s.toggleParkings);
+
   // Live metrics
   const [distanceToRoute, setDistanceToRoute] = useState<number | null>(null);
   const [remainingDistance, setRemainingDistance] = useState<number | null>(null);
   const [remainingDuration, setRemainingDuration] = useState<number | null>(null);
+
+  // extras: real‑time hazards & parking spots
+  const [hazards, setHazards] = useState<Hazard[]>([]);
+  const [parkings, setParkings] = useState<ParkingSpot[]>([]);
 
   const routeAbortRef = useRef<AbortController | null>(null);
   const stopWatchRef = useRef<null | (() => void)>(null);
@@ -119,6 +133,27 @@ export default function MapScreen() {
   const handleUserGesture = useCallback(() => {
     const s = useNavigationStore.getState();
     if (s.isNavigating) s.setFollowUser(false);
+  }, []);
+
+  // fetch hazards & parking every minute
+  useEffect(() => {
+    let mounted = true;
+    async function loadAll() {
+      try {
+        const [h, p] = await Promise.all([fetchHazards(), fetchParkingSpots()]);
+        if (!mounted) return;
+        setHazards(h);
+        setParkings(p);
+      } catch (e) {
+        console.warn("failed to load map extras", e);
+      }
+    }
+    loadAll();
+    const id = window.setInterval(loadAll, 60 * 1000);
+    return () => {
+      mounted = false;
+      window.clearInterval(id);
+    };
   }, []);
 
   // ✅ request notifications permission once (Android 13+ needs it)
@@ -607,6 +642,11 @@ export default function MapScreen() {
             selectedRoute={selected?.geometry ?? null}
             alternativeRoutes={altRoutes}
             zoom={mapZoom}
+
+            hazards={hazards}
+            parkings={parkings}
+            hazardsVisible={showHazards}
+            parkingsVisible={showParkings}
           />
         ) : (
           <div className="h-full w-full flex items-center justify-center">
@@ -826,7 +866,93 @@ export default function MapScreen() {
             </div>
 
             {/* Polished toggles */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-4 gap-2">
+              {/* Dangers */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showHazards}
+                onClick={() => toggleHazards()}
+                className={[
+                  "h-[68px] w-full relative flex items-center justify-between gap-3 rounded-2xl border px-4 transition select-none",
+                  showHazards
+                    ? "border-red-500/40 bg-red-500/10 hover:bg-red-500/15"
+                    : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900/60",
+                ].join(" ")}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className={showHazards ? "text-red-200" : "text-zinc-300"}>⚠️</span>
+                  <div className="min-w-0 leading-none">
+                    <div
+                      className={showHazards ? "text-red-100" : "text-zinc-100"}
+                      style={{ fontSize: 12, fontWeight: 700 }}
+                    >
+                      Dangers
+                    </div>
+                    <div className="mt-1 text-[11px] text-zinc-400 truncate">En temps réel</div>
+                  </div>
+                </div>
+
+                <div className="shrink-0">
+                  <div
+                    className={[
+                      "relative h-7 w-12 rounded-full border transition",
+                      showHazards ? "border-red-400/50 bg-red-400/25" : "border-zinc-700 bg-zinc-900/60",
+                    ].join(" ")}
+                  >
+                    <span
+                      className={[
+                        "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full shadow-sm transition-all",
+                        showHazards ? "left-[22px] bg-red-200" : "left-[2px] bg-zinc-200",
+                      ].join(" ")}
+                    />
+                  </div>
+                </div>
+              </button>
+
+              {/* Parkings */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showParkings}
+                onClick={() => toggleParkings()}
+                className={[
+                  "h-[68px] w-full relative flex items-center justify-between gap-3 rounded-2xl border px-4 transition select-none",
+                  showParkings
+                    ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/15"
+                    : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900/60",
+                ].join(" ")}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className={showParkings ? "text-emerald-200" : "text-zinc-300"}>🅿️</span>
+                  <div className="min-w-0 leading-none">
+                    <div
+                      className={showParkings ? "text-emerald-100" : "text-zinc-100"}
+                      style={{ fontSize: 12, fontWeight: 700 }}
+                    >
+                      Parkings
+                    </div>
+                    <div className="mt-1 text-[11px] text-zinc-400 truncate">Mobilités douces</div>
+                  </div>
+                </div>
+
+                <div className="shrink-0">
+                  <div
+                    className={[
+                      "relative h-7 w-12 rounded-full border transition",
+                      showParkings ? "border-emerald-400/50 bg-emerald-400/25" : "border-zinc-700 bg-zinc-900/60",
+                    ].join(" ")}
+                  >
+                    <span
+                      className={[
+                        "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full shadow-sm transition-all",
+                        showParkings ? "left-[22px] bg-emerald-200" : "left-[2px] bg-zinc-200",
+                      ].join(" ")}
+                    />
+                  </div>
+                </div>
+              </button>
+
               {/* Auto-route */}
               <button
                 type="button"

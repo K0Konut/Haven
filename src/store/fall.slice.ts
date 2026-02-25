@@ -41,49 +41,73 @@ type FallState = {
   reset: () => void;
 };
 
-export const useFallStore = create<FallState>((set) => ({
-  enabled: false,
-  status: "idle",
-  lastConfidence: null,
+export const useFallStore = create<FallState>((set) => {
+  // read persisted state from localStorage (synchronous during init)
+  let persistedEnabled = false;
+  let persistedConfig: Partial<FallConfig> | null = null;
+  try {
+    const e = localStorage.getItem("fall:enabled");
+    if (e != null) persistedEnabled = JSON.parse(e) as boolean;
+    const c = localStorage.getItem("fall:config");
+    if (c) persistedConfig = JSON.parse(c);
+  } catch {
+    /* ignore */
+  }
 
-  countdownSec: 0,
-  countdownActive: false,
+  return {
+    enabled: persistedEnabled,
+    status: "idle",
+    lastConfidence: null,
 
-  lastAlertAt: null,
+    countdownSec: 0,
+    countdownActive: false,
 
-  config: {
-    countdownSeconds: 15,
-    warmupMs: 2500,
-    cooldownMs: 20000,
-    minSampleHz: 10,
-  },
+    lastAlertAt: null,
 
-  setEnabled: (v) => set({ enabled: v }),
-  setStatus: (s) => set({ status: s }),
-  setConfidence: (c) => set({ lastConfidence: c }),
+    config: {
+      countdownSeconds: 15,
+      warmupMs: 2500,
+      cooldownMs: 20000,
+      minSampleHz: 10,
+      ...persistedConfig,
+    },
 
-  startCountdown: (sec) =>
-    set({ countdownSec: sec, countdownActive: true, status: "countdown" }),
+    setEnabled: (v) => {
+      try { localStorage.setItem("fall:enabled", JSON.stringify(v)); } catch {}
+      set({ enabled: v });
+    },
 
-  tick: () =>
-    set((s) => ({ countdownSec: Math.max(0, s.countdownSec - 1) })),
+    setStatus: (s) => set({ status: s }),
 
-  cancelCountdown: () =>
-    set({ countdownActive: false, countdownSec: 0, status: "listening" }),
+    setConfidence: (c) => set({ lastConfidence: c }),
 
-  forceSendNow: () =>
-    set({ countdownSec: 0, countdownActive: true, status: "countdown" }),
+    startCountdown: (sec) =>
+      set({ countdownSec: sec, countdownActive: true, status: "countdown" }),
 
-  setLastAlertAt: (t) => set({ lastAlertAt: t }),
+    tick: () =>
+      set((s) => ({ countdownSec: Math.max(0, s.countdownSec - 1) })),
 
-  setConfig: (patch) =>
-    set((s) => ({ config: { ...s.config, ...patch } })),
+    cancelCountdown: () =>
+      set({ countdownActive: false, countdownSec: 0, status: "listening" }),
 
-  reset: () =>
-    set({
-      status: "idle",
-      lastConfidence: null,
-      countdownActive: false,
-      countdownSec: 0,
-    }),
-}));
+    forceSendNow: () =>
+      set({ countdownSec: 0, countdownActive: true, status: "countdown" }),
+
+    setLastAlertAt: (t) => set({ lastAlertAt: t }),
+
+    setConfig: (patch) =>
+      set((s) => {
+        const cfg = { ...s.config, ...patch };
+        try { localStorage.setItem("fall:config", JSON.stringify(cfg)); } catch {}
+        return { config: cfg };
+      }),
+
+    reset: () =>
+      set({
+        status: "idle",
+        lastConfidence: null,
+        countdownActive: false,
+        countdownSec: 0,
+      }),
+  };
+});

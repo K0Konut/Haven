@@ -59,8 +59,7 @@ Some of the core ideas are:
 
 - 🛡️ **Safety & Emergency Features**  
   Includes primitives for fall detection, countdown before alert, haptics, and local notifications to enhance rider safety.
-
-- 📱 **Cross-Platform Support**  
+  Also visualises real‑time hazards reported by users and shows parking spots for micro‑mobility (Vélib', scooters, etc.). Toggling is available on the map screen.
   Runs as a web app and can be bundled to Android/iOS using Capacitor, bridging web code with native capabilities (GPS, haptics, notifications).
 
 - 🧰 **Developer Friendly**  

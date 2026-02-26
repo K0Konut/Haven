@@ -6,6 +6,9 @@ export type RoutingPreference = {
   // 0..1 : on s’en sert comme poids
   preferBikeLanes?: number;
   preferQuietStreets?: number;
+
+  // when true, requests should avoid motorways/highways if possible
+  avoidHighways?: boolean;
 };
 
 export type RouteRequest = {

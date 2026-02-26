@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ensureLocationPermission,
   getCurrentPosition,
@@ -50,6 +51,7 @@ function gpsPillClass(q: GpsQuality) {
 
 export default function MapScreen() {
   const { permission, fix, setPermission, setFix } = useLocationStore();
+  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
   const routing = useRoutingStore();
@@ -68,13 +70,12 @@ export default function MapScreen() {
   const [searchError, setSearchError] = useState<string | null>(null);
 
   // UX toggles
-  const [autoRouting, setAutoRouting] = useState(true);
+  const [autoRouting] = useState(true); // always auto-start when selecting destination
+  const [avoidHighways, setAvoidHighways] = useState(false);
 
   // extras visibility (global store)
   const showHazards = useOverlayStore((s) => s.showHazards);
   const showParkings = useOverlayStore((s) => s.showParkings);
-  const toggleHazards = useOverlayStore((s) => s.toggleHazards);
-  const toggleParkings = useOverlayStore((s) => s.toggleParkings);
 
   // Live metrics
   const [distanceToRoute, setDistanceToRoute] = useState<number | null>(null);
@@ -243,12 +244,16 @@ export default function MapScreen() {
         {
           origin: fix,
           destination: dest.center,
-          preference: { preferBikeLanes: 1, preferQuietStreets: 0.8 },
+          preference: {
+            preferBikeLanes: 1,
+            preferQuietStreets: 0.8,
+            avoidHighways: avoidHighways,
+          },
         },
         { signal: ac.signal }
       );
     },
-    [fix, routing]
+    [fix, routing, avoidHighways]
   );
 
     function setAsDestination(r: PlaceResult) {
@@ -293,7 +298,10 @@ export default function MapScreen() {
 
     // reset zoom doux
     setMapZoom(16);
-  }, [nav]);
+
+    // revenir à l'accueil après arrêt
+    navigate("/");
+  }, [nav, navigate]);
 
   function clearDestination() {
     stopNavigation();
@@ -678,6 +686,17 @@ export default function MapScreen() {
             </div>
           )}
 
+          {/* Home button when navigating (pause) */}
+          {isNavigating && (
+            <button
+              onClick={() => navigate("/")}
+              className="absolute top-3 right-3 z-20 rounded-full bg-black/50 p-2 text-white"
+              title="Accueil (pause)"
+            >
+              🏠
+            </button>
+          )}
+
           {/* Toast reroute automatique */}
           {rerouteBannerLabel && (
             <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 text-amber-100 px-3 py-2 text-xs flex items-center justify-between gap-2">
@@ -865,186 +884,36 @@ export default function MapScreen() {
               </div>
             </div>
 
-            {/* Polished toggles */}
-            <div className="grid grid-cols-4 gap-2">
-              {/* Dangers */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={showHazards}
-                onClick={() => toggleHazards()}
-                className={[
-                  "h-[68px] w-full relative flex items-center justify-between gap-3 rounded-2xl border px-4 transition select-none",
-                  showHazards
-                    ? "border-red-500/40 bg-red-500/10 hover:bg-red-500/15"
-                    : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900/60",
-                ].join(" ")}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className={showHazards ? "text-red-200" : "text-zinc-300"}>⚠️</span>
-                  <div className="min-w-0 leading-none">
-                    <div
-                      className={showHazards ? "text-red-100" : "text-zinc-100"}
-                      style={{ fontSize: 12, fontWeight: 700 }}
-                    >
-                      Dangers
-                    </div>
-                    <div className="mt-1 text-[11px] text-zinc-400 truncate">En temps réel</div>
-                  </div>
-                </div>
-
-                <div className="shrink-0">
-                  <div
-                    className={[
-                      "relative h-7 w-12 rounded-full border transition",
-                      showHazards ? "border-red-400/50 bg-red-400/25" : "border-zinc-700 bg-zinc-900/60",
-                    ].join(" ")}
-                  >
-                    <span
-                      className={[
-                        "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full shadow-sm transition-all",
-                        showHazards ? "left-[22px] bg-red-200" : "left-[2px] bg-zinc-200",
-                      ].join(" ")}
-                    />
-                  </div>
-                </div>
-              </button>
-
-              {/* Parkings */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={showParkings}
-                onClick={() => toggleParkings()}
-                className={[
-                  "h-[68px] w-full relative flex items-center justify-between gap-3 rounded-2xl border px-4 transition select-none",
-                  showParkings
-                    ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/15"
-                    : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900/60",
-                ].join(" ")}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className={showParkings ? "text-emerald-200" : "text-zinc-300"}>🅿️</span>
-                  <div className="min-w-0 leading-none">
-                    <div
-                      className={showParkings ? "text-emerald-100" : "text-zinc-100"}
-                      style={{ fontSize: 12, fontWeight: 700 }}
-                    >
-                      Parkings
-                    </div>
-                    <div className="mt-1 text-[11px] text-zinc-400 truncate">Mobilités douces</div>
-                  </div>
-                </div>
-
-                <div className="shrink-0">
-                  <div
-                    className={[
-                      "relative h-7 w-12 rounded-full border transition",
-                      showParkings ? "border-emerald-400/50 bg-emerald-400/25" : "border-zinc-700 bg-zinc-900/60",
-                    ].join(" ")}
-                  >
-                    <span
-                      className={[
-                        "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full shadow-sm transition-all",
-                        showParkings ? "left-[22px] bg-emerald-200" : "left-[2px] bg-zinc-200",
-                      ].join(" ")}
-                    />
-                  </div>
-                </div>
-              </button>
-
-              {/* Auto-route */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={autoRouting}
-                disabled={isNavigating}
-                onClick={() => setAutoRouting((v) => !v)}
-                className={[
-                  "h-[68px] w-full relative flex items-center justify-between gap-3 rounded-2xl border px-4 transition select-none",
-                  isNavigating
-                    ? "cursor-not-allowed opacity-50 border-zinc-800 bg-zinc-950/40"
-                    : autoRouting
-                      ? "border-sky-500/40 bg-sky-500/10 hover:bg-sky-500/15"
-                      : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900/60",
-                ].join(" ")}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className={autoRouting ? "text-sky-200" : "text-zinc-300"}>🧭</span>
-                  <div className="min-w-0 leading-none">
-                    <div
-                      className={autoRouting ? "text-sky-100" : "text-zinc-100"}
-                      style={{ fontSize: 12, fontWeight: 700 }}
-                    >
-                      Auto-route
-                    </div>
-                    <div className="mt-1 text-[11px] text-zinc-400 truncate">Calcule à la sélection</div>
-                  </div>
-                </div>
-
-                <div className="shrink-0">
-                  <div
-                    className={[
-                      "relative h-7 w-12 rounded-full border transition",
-                      autoRouting ? "border-sky-400/50 bg-sky-400/25" : "border-zinc-700 bg-zinc-900/60",
-                    ].join(" ")}
-                  >
-                    <span
-                      className={[
-                        "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full shadow-sm transition-all",
-                        autoRouting ? "left-[22px] bg-sky-200" : "left-[2px] bg-zinc-200",
-                      ].join(" ")}
-                    />
-                  </div>
-                </div>
-              </button>
-
-              {/* Suivre */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={navFollowUser}
-                disabled={!isNavigating}
-                onClick={() => nav.setFollowUser(!navFollowUser)}
-                className={[
-                  "h-[68px] w-full relative flex items-center justify-between gap-3 rounded-2xl border px-4 transition select-none",
-                  !isNavigating
-                    ? "cursor-not-allowed opacity-50 border-zinc-800 bg-zinc-950/40"
-                    : navFollowUser
-                      ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/15"
-                      : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900/60",
-                ].join(" ")}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className={navFollowUser ? "text-emerald-200" : "text-zinc-300"}>🎯</span>
-                  <div className="min-w-0 leading-none">
-                    <div
-                      className={navFollowUser ? "text-emerald-100" : "text-zinc-100"}
-                      style={{ fontSize: 12, fontWeight: 700 }}
-                    >
-                      Suivre
-                    </div>
-                    <div className="mt-1 text-[11px] text-zinc-400 truncate">Caméra sur toi</div>
-                  </div>
-                </div>
-
-                <div className="shrink-0">
-                  <div
-                    className={[
-                      "relative h-7 w-12 rounded-full border transition",
-                      navFollowUser ? "border-emerald-400/50 bg-emerald-400/25" : "border-zinc-700 bg-zinc-900/60",
-                    ].join(" ")}
-                  >
-                    <span
-                      className={[
-                        "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full shadow-sm transition-all",
-                        navFollowUser ? "left-[22px] bg-emerald-200" : "left-[2px] bg-zinc-200",
-                      ].join(" ")}
-                    />
-                  </div>
-                </div>
-              </button>
-            </div>
+{/* Floating controls to mimic previous minimal UI */}
+              <div className="absolute bottom-28 right-4 flex flex-col gap-2 z-20">
+                <button
+                  type="button"
+                  onClick={() => nav.setFollowUser(!navFollowUser)}
+                  disabled={!isNavigating}
+                  title="Caméra suivante"
+                  className={[
+                    "h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition",
+                    !isNavigating
+                      ? "opacity-50 cursor-not-allowed bg-zinc-900"
+                      : navFollowUser
+                        ? "bg-emerald-500"
+                        : "bg-zinc-800",
+                  ].join(" ")}
+                >
+                  🎯
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAvoidHighways((v) => !v)}
+                  title="Éviter autoroutes"
+                  className={[
+                    "h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition",
+                    avoidHighways ? "bg-amber-500" : "bg-zinc-800",
+                  ].join(" ")}
+                >
+                  ⛔
+                </button>
+              </div>
 
             {/* ACTIONS */}
             <div className="flex gap-2">

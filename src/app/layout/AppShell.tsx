@@ -18,7 +18,6 @@ export default function AppShell() {
 
   return (
     <div className="h-[100dvh] w-full bg-zinc-950 text-zinc-100 overflow-hidden flex flex-col">
-      {/* MAIN (scrollable only when NOT map) */}
       <main
         className={
           isMap
@@ -39,7 +38,6 @@ export default function AppShell() {
         <Outlet />
       </main>
 
-      {/* NAV */}
       <nav
         className="shrink-0 border-t border-zinc-800 bg-zinc-950/90 backdrop-blur"
         style={navStyle}
@@ -73,6 +71,16 @@ export default function AppShell() {
           >
             <span className="text-base">⚙️</span>
             Réglages
+          </NavLink>
+
+          <NavLink
+            to="/login"
+            className={({ isActive }) =>
+              `${linkBase} ${isActive ? active : inactive}`
+            }
+          >
+            <span className="text-base">🔐</span>
+            Connexion
           </NavLink>
         </div>
 

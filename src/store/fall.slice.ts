@@ -7,6 +7,10 @@ export type FallConfig = {
   warmupMs: number;
   cooldownMs: number;
   minSampleHz: number;
+  // Engine thresholds for advanced users
+  impactG: number;
+  impactGyroDps: number;
+  freefallG: number;
 };
 
 type FallState = {
@@ -69,6 +73,9 @@ export const useFallStore = create<FallState>((set) => {
       warmupMs: 2500,
       cooldownMs: 20000,
       minSampleHz: 10,
+      impactG: 1.8,
+      impactGyroDps: 100,
+      freefallG: 0.6,
       ...persistedConfig,
     },
 

@@ -19,11 +19,12 @@ function mag3(x = 0, y = 0, z = 0) {
 }
 
 export function useFallDetection(opts: Options = {}) {
-  const countdownSeconds = opts.countdownSeconds ?? 15;
-
-  const warmupMs = opts.warmupMs ?? 2500;
-  const cooldownMs = opts.cooldownMs ?? 20000;
-  const minSampleHz = opts.minSampleHz ?? 10;
+  const config = useFallStore((s) => s.config);
+  
+  const countdownSeconds = opts.countdownSeconds ?? config.countdownSeconds ?? 15;
+  const warmupMs = opts.warmupMs ?? config.warmupMs ?? 2500;
+  const cooldownMs = opts.cooldownMs ?? config.cooldownMs ?? 20000;
+  const minSampleHz = opts.minSampleHz ?? config.minSampleHz ?? 10;
 
   const setStatus = useFallStore((s) => s.setStatus);
   const setConfidence = useFallStore((s) => s.setConfidence);
@@ -40,7 +41,11 @@ export function useFallDetection(opts: Options = {}) {
   const setLastAlertAt = useFallStore((s) => s.setLastAlertAt);
 
   const listenerRef = useRef<PluginListenerHandle | null>(null);
-  const engineRef = useRef(new FallEngine());
+  const engineRef = useRef(new FallEngine({
+    impactG: config.impactG,
+    impactGyroDps: config.impactGyroDps,
+    freefallG: config.freefallG,
+  }));
   const countdownTimerRef = useRef<number | null>(null);
 
   const firedRef = useRef(false);
@@ -153,6 +158,9 @@ export function useFallDetection(opts: Options = {}) {
     minSampleHz,
     lastAlertAt,
     countdownSeconds,
+    config.impactG,
+    config.impactGyroDps,
+    config.freefallG,
     setStatus,
     setConfidence,
     startCountdown,

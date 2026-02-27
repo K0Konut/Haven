@@ -9,15 +9,16 @@ export default function Home() {
   useEffect(() => {
     const s = loadNavSession();
     if (s) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSessionDest(s.destination.label);
     }
-  }, []);
+  }, []); // setSessionDest is stable, safe to omit from deps
 
   return (
     <section className="space-y-4">
       <header>
-        <h2 className="text-2xl font-bold">👋 Bonjour !</h2>
-        <p className="text-sm text-zinc-400">Prêt pour une balade ?</p>
+        <h2 className="text-2xl font-bold">Bonjour !</h2>
+        <p className="text-sm text-zinc-400">Pret pour une balade ?</p>
       </header>
 
       {sessionDest && (
@@ -25,7 +26,7 @@ export default function Home() {
           onClick={() => navigate("/map")}
           className="w-full rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/15"
         >
-          🔁 Reprendre vers « {sessionDest} »
+          🔁 Reprendre vers "{sessionDest}"
         </button>
       )}
 

@@ -73,7 +73,9 @@ export const useFallStore = create<FallState>((set) => {
     },
 
     setEnabled: (v) => {
-      try { localStorage.setItem("fall:enabled", JSON.stringify(v)); } catch {}
+      try { localStorage.setItem("fall:enabled", JSON.stringify(v)); } catch {
+        // noop (localStorage not available)
+      }
       set({ enabled: v });
     },
 
@@ -98,7 +100,9 @@ export const useFallStore = create<FallState>((set) => {
     setConfig: (patch) =>
       set((s) => {
         const cfg = { ...s.config, ...patch };
-        try { localStorage.setItem("fall:config", JSON.stringify(cfg)); } catch {}
+        try { localStorage.setItem("fall:config", JSON.stringify(cfg)); } catch {
+          // noop (localStorage not available)
+        }
         return { config: cfg };
       }),
 

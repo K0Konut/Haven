@@ -197,7 +197,7 @@ export default function MapView({
       map.on('mouseenter', LYR_HAZARDS, () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', LYR_HAZARDS, () => (map.getCanvas().style.cursor = ''));
       map.on('click', LYR_HAZARDS, (e) => {
-        const prop = e.features?.[0]?.properties as any;
+        const prop = e.features?.[0]?.properties as Record<string, string | undefined>;
         const text = prop?.type ? `Danger: ${prop.type}` : 'Danger signalé';
         new mapboxgl.Popup().setLngLat(e.lngLat).setText(text).addTo(map);
       });
@@ -205,7 +205,7 @@ export default function MapView({
       map.on('mouseenter', LYR_PARKING, () => (map.getCanvas().style.cursor = 'pointer'));
       map.on('mouseleave', LYR_PARKING, () => (map.getCanvas().style.cursor = ''));
       map.on('click', LYR_PARKING, (e) => {
-        const prop = e.features?.[0]?.properties as any;
+        const prop = e.features?.[0]?.properties as Record<string, string | undefined>;
         const text = prop?.type
           ? `Parking ${prop.type}`
           : 'Emplacement de stationnement';

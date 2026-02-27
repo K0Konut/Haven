@@ -33,11 +33,12 @@ export default function Home() {
   const totalKm = (totalDistanceMeters / 1000).toFixed(1);
   const totalMin = Math.round(totalDurationSec / 60);
   const lastRideLabel = formatLastRide(lastRide);
+  const greeting = getGreeting();
 
   return (
     <section className="space-y-4">
       <header>
-        <h2 className="text-2xl font-bold">👋 Bonjour !</h2>
+      <h2 className="text-2xl font-bold"> {greeting.text} !</h2>
         <p className="text-sm text-zinc-400">Prêt pour une balade ?</p>
       </header>
 

@@ -25,6 +25,15 @@ function getGreeting(): { text: string; emoji: string } {
   return { text: "Bonne nuit", emoji: "🌙" };
 }
 
+function getSubtitle(): string {
+  const hour = new Date().getHours();
+if (hour >= 5 && hour < 12) return "Prêt pour une balade matinale ?";
+  if (hour >= 12 && hour < 14) return "Une balade après le déjeuner ?";
+  if (hour >= 14 && hour < 18) return "Prêt pour une balade ?";
+  if (hour >= 18 && hour < 22) return "Une petite balade ce soir ?";
+  return "Une balade nocturne ?";
+}
+
 
 export default function Home() {
   const navigate = useNavigate();
@@ -39,7 +48,7 @@ export default function Home() {
     <section className="space-y-4">
       <header>
       <h2 className="text-2xl font-bold"> {greeting.text} !</h2>
-        <p className="text-sm text-zinc-400">Prêt pour une balade ?</p>
+        <p className="text-sm text-zinc-400">{getSubtitle()}</p>
       </header>
 
       <button

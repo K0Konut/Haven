@@ -2,9 +2,11 @@ name: Test & Lint
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, "feature-detection-de-chute" ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, "feature-detection-de-chute" ]
+  # allow manual runs from Actions tab (handy when you're on a feature branch)
+  workflow_dispatch: {}
 
 jobs:
   test:

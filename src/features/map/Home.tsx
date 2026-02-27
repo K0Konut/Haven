@@ -17,6 +17,15 @@ function formatLastRide(lastRide: { date: string; distanceMeters: number; durati
   return `${label} • ${km} km • ${min} min`;
 }
 
+function getGreeting(): { text: string; emoji: string } {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return { text: "Bonjour", emoji: "👋" };
+  if (hour >= 12 && hour < 18) return { text: "Bonne après-midi", emoji: "☀️" };
+  if (hour >= 18 && hour < 22) return { text: "Bonsoir", emoji: "🌆" };
+  return { text: "Bonne nuit", emoji: "🌙" };
+}
+
+
 export default function Home() {
   const navigate = useNavigate();
   const { totalDistanceMeters, totalDurationSec, totalRides, lastRide } = useStatsStore();

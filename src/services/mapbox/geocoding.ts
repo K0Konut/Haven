@@ -7,7 +7,7 @@ export type PlaceResult = {
   center: LatLng;
 };
 
-export async function geocodeForward(query: string, proximity?: LatLng): Promise<PlaceResult[]> {
+export async function geocodeForward(query: string): Promise<PlaceResult[]> {
   const q = query.trim();
   if (!q) return [];
 

@@ -214,7 +214,7 @@ export default function MapScreen() {
     try {
       setSearchError(null);
       setSearchLoading(true);
-      const r = await geocodeForward(query, fix ?? undefined);
+      const r = await geocodeForward(query);
       setResults(r);
     } catch (e) {
       setSearchError(e instanceof Error ? e.message : "Erreur recherche");
@@ -800,7 +800,7 @@ export default function MapScreen() {
               </div>
 
               {showResults && (
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 backdrop-blur shadow-lg overflow-hidden">
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 backdrop-blur shadow-lg overflow-hidden max-h-64 overflow-y-auto touch-pan-y">
                   {results.slice(0, 6).map((r) => (
                     <div key={r.id} className="px-3 py-2 border-b border-zinc-900 last:border-b-0">
                       <div className="text-sm text-zinc-100">{r.label}</div>

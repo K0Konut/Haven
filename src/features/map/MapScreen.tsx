@@ -16,7 +16,7 @@ import {
   distanceToRouteMeters,
   remainingRouteDistanceMeters,
 } from "../../services/routing/geo";
-
+import { saveTripToHistory } from "../../services/history";
 import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { loadNavSession, saveNavSession } from "../../services/navigation/persistence";
@@ -481,16 +481,20 @@ export default function MapScreen() {
       }
 
       // Arrivé
-      if (rem < 25) {
-        if (navStartAtRef.current != null) {
-          const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
-          setNavActualDurationSec(elapsedSec);
+      if (rem < 35) {
+      if (navStartAtRef.current != null) {
+        const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
+        setNavActualDurationSec(elapsedSec);
+        
+        if (destination && selected) {
+          saveTripToHistory(destination.label, selected.summary.distanceMeters, Math.round(elapsedSec));
         }
-        setHasArrived(true);
-
-        stopNavigation();
-        return;
       }
+      setHasArrived(true);
+
+      stopNavigation();
+      return;
+    }
 
       // Reroute (stable + accuracy)
       const ACC_OK = accGps < GPS_MAX_ACC_FOR_REROUTE;

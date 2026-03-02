@@ -4,11 +4,12 @@ import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyByhQEoKzDvJiIbJaTeWtGOpY8xA1LDGxw",
-  authDomain: "ton-projet.firebaseapp.com",
-  projectId: "ton-projet",
-  storageBucket: "ton-projet.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
+  authDomain: "haven-eeab1.firebaseapp.com",
+  projectId: "haven-eeab1",
+  storageBucket: "haven-eeab1.firebasestorage.app",
+  messagingSenderId: "69781912405",
+  appId: "1:69781912405:web:545fc4bc674417d371cddc",
+  measurementId: "G-PWQRPX1JGT"
 };
 
 const app = initializeApp(firebaseConfig);

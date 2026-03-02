@@ -6,69 +6,65 @@ interface Trip {
   id: string;
   destination: string;
   distance: number;
-  duration: number;
+}
+
+interface Incident {
+  id: string;
+  latitude: number;
+  longitude: number;
 }
 
 export default function HistoryScreen() {
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchHistory() {
+    async function fetchData() {
       const user = auth.currentUser;
       if (!user) {
         setLoading(false);
         return;
       }
 
-      const historyRef = collection(db, "users", user.uid, "history");
-      const q = query(historyRef, orderBy("createdAt", "desc"));
-      
       try {
-        const querySnapshot = await getDocs(q);
-        const historyData: Trip[] = [];
-        
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          historyData.push({
-            id: doc.id,
-            destination: data.destination,
-            distance: data.distance,
-            duration: data.duration,
-          });
-        });
-        
-        setTrips(historyData);
+        const historySnap = await getDocs(query(collection(db, "users", user.uid, "history"), orderBy("createdAt", "desc")));
+        setTrips(historySnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip)));
+
+        const incidentsSnap = await getDocs(query(collection(db, "users", user.uid, "incidents"), orderBy("timestamp", "desc")));
+        setIncidents(incidentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Incident)));
       } catch (error) {
         console.error(error);
       } finally {
         setLoading(false);
       }
     }
-
-    fetchHistory();
+    fetchData();
   }, []);
 
-  if (loading) {
-    return <div>Chargement de l'historique...</div>;
-  }
+  if (loading) return <div>Chargement...</div>;
 
   return (
     <div style={{ padding: 20 }}>
-      <h2>Mon Historique de Trajets</h2>
-      {trips.length === 0 ? (
-        <p>Aucun trajet enregistré pour le moment.</p>
-      ) : (
-        <ul style={{ listStyleType: "none", padding: 0 }}>
-          {trips.map((trip) => (
-            <li key={trip.id} style={{ marginBottom: 15, padding: 10, border: "1px solid #ccc", borderRadius: 8 }}>
-              <strong>{trip.destination}</strong><br />
-              Distance : {trip.distance} mètres<br />
-              Durée : {trip.duration} secondes
-            </li>
-          ))}
-        </ul>
-      )}
+      <h2>Historique & Incidents</h2>
+      
+      <section>
+        <h3>Mes Trajets</h3>
+        {trips.map(t => (
+          <div key={t.id} style={{ border: "1px solid #ccc", padding: 10, marginBottom: 10 }}>
+            {t.destination} ({t.distance}m)
+          </div>
+        ))}
+      </section>
+
+      <section style={{ marginTop: 30 }}>
+        <h3 style={{ color: "red" }}>Zones de Chute détectées</h3>
+        {incidents.length === 0 ? <p>Aucun incident.</p> : incidents.map(i => (
+          <div key={i.id} style={{ border: "1px solid red", padding: 10, marginBottom: 10 }}>
+            Lieu : {i.latitude.toFixed(4)}, {i.longitude.toFixed(4)}
+          </div>
+        ))}
+      </section>
     </div>
   );
 }

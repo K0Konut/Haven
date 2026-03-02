@@ -3,7 +3,7 @@ import AppShell from "../layout/AppShell";
 import Home from "../../features/map/Home";
 import MapScreen from "../../features/map/MapScreen";
 import SettingsScreen from "../../features/settings/SettingScreen";
-import { LoginScreen } from "../../features/auth/LoginScreen";
+import LoginScreen from "../../features/auth/LoginScreen";
 import HistoryScreen from "../../features/history/HistoryScreen";
 
 export const router = createHashRouter([

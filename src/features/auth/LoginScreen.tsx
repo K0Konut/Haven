@@ -1,26 +1,59 @@
-import React, { useState } from 'react';
-import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { useState, useEffect } from "react";
+import { auth, provider } from "../../app/config/firebase";
+import { signInWithPopup, signOut, onAuthStateChanged, type User } from "firebase/auth";
 
-export const LoginScreen = () => {
-  const [error, setError] = useState('');
+export default function LoginScreen() {
+  const [user, setUser] = useState<User | null>(null);
 
- const handleGoogleLogin = async () => {
-  try {
-    const result = await FirebaseAuthentication.signInWithGoogle();
-    console.log("Connecté avec Google :", result.user);
-  } catch (err: any) {
-    console.error(err);
-    setError("Erreur lors de la connexion Google");
-  }
-};
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   return (
-    <div style={{ padding: '20px', textAlign: 'center' }}>
-      <h2>Connexion à HAVEN</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <button onClick={handleGoogleLogin} style={{ padding: '10px 20px', marginTop: '10px' }}>
-        Se connecter avec Google
-      </button>
+    <div style={{ textAlign: "center", paddingTop: "50px", color: "white" }}>
+      {user ? (
+        <div>
+          <img 
+          src={user.photoURL || ""} 
+           alt="Profil" 
+            referrerPolicy="no-referrer" // <--- Ajoute cette ligne impérativement
+            style={{ 
+            width: 80, 
+            height: 80, // Ajoute une hauteur fixe
+            borderRadius: "50%", 
+            marginBottom: 20,
+            display: "block", // Force l'image à se comporter comme un bloc
+            margin: "0 auto"  // Centre l'image horizontalement
+  }} 
+/>
+          <p>Bienvenue, {user.displayName}</p>
+          <button onClick={handleLogout}>Se déconnecter</button>
+        </div>
+      ) : (
+        <div>
+          <h1>Connexion à HAVEN</h1>
+          <button onClick={handleLogin}>Se connecter avec Google</button>
+        </div>
+      )}
     </div>
   );
-};
+}

@@ -11,7 +11,7 @@ import { sendEmergencyEmail } from "../../services/emergency/email";
 import { useLocationStore } from "../../store/location.slice";
 
 const DEFAULT_MSG =
-  "🚨 SoftRide: chute potentielle détectée. Si je ne réponds pas, peux-tu me contacter ?";
+  "🚨 Haven: chute potentielle détectée. Si je ne réponds pas, peux-tu me contacter ?";
 
 export default function SettingsScreen() {
   const fix = useLocationStore((s) => s.fix);
@@ -62,7 +62,7 @@ async function handleTestEmail() {
 
     const msg =
       (contact.message?.trim() || DEFAULT_MSG) +
-      "\n\n✅ Test SoftRide : ceci est un message de test (pas une vraie alerte).";
+      "\n\n✅ Test Haven : ceci est un message de test (pas une vraie alerte).";
 
     try {
       await sendEmergencyEmail({

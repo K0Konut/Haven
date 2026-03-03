@@ -68,8 +68,8 @@ export const useFallStore = create<FallState>((set) => {
     /* ignore */
   }
 
-  const safeImpactG = Math.max(1.0, persistedConfig?.impactG ?? 1.0);
-  const safeImpactGyroDps = Math.max(80, persistedConfig?.impactGyroDps ?? 80);
+  const safeImpactG = Math.max(1.1, persistedConfig?.impactG ?? 1.1);
+  const safeImpactGyroDps = Math.max(90, persistedConfig?.impactGyroDps ?? 90);
 
   return {
     enabled: persistedEnabled,

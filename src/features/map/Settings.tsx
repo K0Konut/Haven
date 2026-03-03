@@ -57,7 +57,7 @@ export default function Settings() {
             className="w-full accent-sky-500"
           />
           <p className="text-xs text-zinc-500">
-            Par défaut: 1.0g
+            Par défaut: 1.1g
           </p>
         </div>
 
@@ -82,7 +82,7 @@ export default function Settings() {
             className="w-full accent-sky-500"
           />
           <p className="text-xs text-zinc-500">
-            Par défaut: 80°/s
+            Par défaut: 90°/s
           </p>
         </div>
 

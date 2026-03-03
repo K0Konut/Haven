@@ -42,6 +42,10 @@ export class FallEngine {
 
   private stillStartAt: number | null = null;
 
+  // Keep history of recent impacts for better confirmation
+  private impactHistory: Array<{ t: number; gMag: number; gyroMag: number }> = [];
+  private readonly maxHistorySize = 3;
+
   constructor(cfg: Partial<FallEngineConfig> = {}) {
     this.cfg = {
       g: 9.80665,
@@ -50,18 +54,19 @@ export class FallEngine {
       impactG: 1.1,
       impactGyroDps: 90,
 
-      freefallWindowMs: 900,
-      stillnessWindowMs: 3000,
+      freefallWindowMs: 1200,
+      stillnessWindowMs: 2000,
       maxImpactToStillnessMs: 9000,
 
-      stillAccelTolG: 0.12,
-      stillGyroMaxDps: 18,
+      stillAccelTolG: 0.25,
+      stillGyroMaxDps: 25,
 
       ...cfg,
     };
   }
 
   reset() {
+    this.impactHistory = [];
     this.state = "IDLE";
     this.lastFreefallAt = null;
     this.impactAt = null;
@@ -81,25 +86,41 @@ export class FallEngine {
       if (this.state === "IDLE") this.state = "FREEFALL";
     }
 
+    // Clear old impact history (older than 5 seconds)
+    if (this.impactHistory.length > 0 && s.t - this.impactHistory[this.impactHistory.length - 1].t > 5000) {
+      this.impactHistory = [];
+    }
+
     // 2) detect impact
     const recentFreefall =
       this.lastFreefallAt != null && (s.t - this.lastFreefallAt) <= this.cfg.freefallWindowMs;
 
     const impactByCombo = gMag >= impactG && gyroMag >= impactGyroDps;
-    const hardImpactOnly = gMag >= impactG + 0.35;
+    const hardImpactOnly = gMag >= impactG + 0.25;
     const impact = impactByCombo || hardImpactOnly;
 
     if (impact) {
       this.impactAt = s.t;
       this.state = "IMPACT";
 
-      // confidence: freefall + strong impact
+      // Track impact for history
+      this.impactHistory.push({ t: s.t, gMag, gyroMag });
+      if (this.impactHistory.length > this.maxHistorySize) {
+        this.impactHistory.shift();
+      }
+
+      // Check if we have multiple impacts close together (typical of real falls)
+      const hasRecentImpact = this.impactHistory.length > 1 && 
+        (s.t - this.impactHistory[0].t) < 800;
+
+      // confidence: freefall + strong impact + history bonus
       const confidence = Math.min(
         1,
         (recentFreefall ? 0.55 : 0.28)
           + Math.min(0.40, Math.max(0, gMag - impactG) * 0.30)
           + Math.min(0.18, gyroMag / 900)
-          + (hardImpactOnly ? 0.12 : 0)
+          + (hardImpactOnly ? 0.15 : 0)
+          + (hasRecentImpact ? 0.10 : 0)
       );
 
       return { type: "POSSIBLE_FALL", confidence };

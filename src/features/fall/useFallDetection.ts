@@ -156,7 +156,7 @@ export function useFallDetection(opts: Options = {}) {
           setStatus("possible");
           setConfidence(out.confidence);
           // in debug/aggressive mode or high-confidence impact we trigger immediately
-          if (config.confirmOnImpact || debug || out.confidence >= 0.72) {
+          if (config.confirmOnImpact || debug || out.confidence >= 0.55) {
             firedRef.current = false;
             startCountdown(countdownSeconds);
           }

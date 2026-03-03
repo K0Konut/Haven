@@ -116,16 +116,19 @@ export function useFallDetection(opts: Options = {}) {
         }
 
         // Anti pocket/handling: too many big gyro spikes => ignore frames
-        const gyroMag = mag3(
-          ev.rotationRate?.alpha ?? 0,
-          ev.rotationRate?.beta ?? 0,
-          ev.rotationRate?.gamma ?? 0
-        );
+        // DISABLED in aggressive mode (confirmOnImpact) - we want to detect ANY movement
+        if (!config.confirmOnImpact) {
+          const gyroMag = mag3(
+            ev.rotationRate?.alpha ?? 0,
+            ev.rotationRate?.beta ?? 0,
+            ev.rotationRate?.gamma ?? 0
+          );
 
-        if (gyroMag > 650) gyroSpikeCountRef.current += 1;
-        else gyroSpikeCountRef.current = Math.max(0, gyroSpikeCountRef.current - 1);
+          if (gyroMag > 650) gyroSpikeCountRef.current += 1;
+          else gyroSpikeCountRef.current = Math.max(0, gyroSpikeCountRef.current - 1);
 
-        if (gyroSpikeCountRef.current >= 4) return;
+          if (gyroSpikeCountRef.current >= 4) return;
+        }
 
         const s = {
           t,

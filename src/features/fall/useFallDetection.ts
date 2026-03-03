@@ -40,12 +40,23 @@ export function useFallDetection(opts: Options = {}) {
   const lastAlertAt = useFallStore((s) => s.lastAlertAt);
   const setLastAlertAt = useFallStore((s) => s.setLastAlertAt);
 
+  const debug = useFallStore((s) => s.debug);
+
   const listenerRef = useRef<PluginListenerHandle | null>(null);
   const engineRef = useRef(new FallEngine({
     impactG: config.impactG,
     impactGyroDps: config.impactGyroDps,
     freefallG: config.freefallG,
   }));
+
+  // if thresholds change we recreate engine instance so new values apply
+  useEffect(() => {
+    engineRef.current = new FallEngine({
+      impactG: config.impactG,
+      impactGyroDps: config.impactGyroDps,
+      freefallG: config.freefallG,
+    });
+  }, [config.impactG, config.impactGyroDps, config.freefallG]);
   const countdownTimerRef = useRef<number | null>(null);
 
   const firedRef = useRef(false);
@@ -135,6 +146,11 @@ export function useFallDetection(opts: Options = {}) {
         if (out.type === "POSSIBLE_FALL") {
           setStatus("possible");
           setConfidence(out.confidence);
+          // in debug/aggressive mode we trigger immediately
+          if (config.confirmOnImpact || debug) {
+            firedRef.current = false;
+            startCountdown(countdownSeconds);
+          }
         }
 
         if (out.type === "FALL_CONFIRMED") {
@@ -161,10 +177,13 @@ export function useFallDetection(opts: Options = {}) {
     config.impactG,
     config.impactGyroDps,
     config.freefallG,
+    config.confirmOnImpact,
+    debug,
     setStatus,
     setConfidence,
     startCountdown,
   ]);
+
 
   // Countdown timer
   useEffect(() => {

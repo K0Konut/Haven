@@ -11,6 +11,8 @@ export type FallConfig = {
   impactG: number;
   impactGyroDps: number;
   freefallG: number;
+  // whether to confirm on first impact (no stillness required)
+  confirmOnImpact: boolean;
 };
 
 type FallState = {
@@ -29,6 +31,9 @@ type FallState = {
   // Tunables
   config: FallConfig;
 
+  // developer helpers
+  debug: boolean;
+
   setEnabled: (v: boolean) => void;
   setStatus: (s: FallStatus) => void;
   setConfidence: (c: number | null) => void;
@@ -42,16 +47,21 @@ type FallState = {
   setLastAlertAt: (t: number | null) => void;
   setConfig: (patch: Partial<FallConfig>) => void;
 
+  setDebug: (v: boolean) => void;
+
   reset: () => void;
 };
 
 export const useFallStore = create<FallState>((set) => {
   // read persisted state from localStorage (synchronous during init)
   let persistedEnabled = false;
+  let persistedDebug = false;
   let persistedConfig: Partial<FallConfig> | null = null;
   try {
     const e = localStorage.getItem("fall:enabled");
     if (e != null) persistedEnabled = JSON.parse(e) as boolean;
+    const d = localStorage.getItem("fall:debug");
+    if (d != null) persistedDebug = JSON.parse(d) as boolean;
     const c = localStorage.getItem("fall:config");
     if (c) persistedConfig = JSON.parse(c);
   } catch {
@@ -76,14 +86,23 @@ export const useFallStore = create<FallState>((set) => {
       impactG: 1.8,
       impactGyroDps: 100,
       freefallG: 0.6,
+      confirmOnImpact: false,
       ...persistedConfig,
     },
+    debug: persistedDebug,
 
     setEnabled: (v) => {
       try { localStorage.setItem("fall:enabled", JSON.stringify(v)); } catch {
         // noop (localStorage not available)
       }
       set({ enabled: v });
+    },
+
+    setDebug: (v) => {
+      try { localStorage.setItem("fall:debug", JSON.stringify(v)); } catch {
+        // noop
+      }
+      set({ debug: v });
     },
 
     setStatus: (s) => set({ status: s }),

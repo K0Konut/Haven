@@ -169,6 +169,20 @@ export default function Settings() {
           </p>
         </div>
 
+        {/* Confirmation immédiate */}
+        <div className="flex items-center gap-2">
+          <input
+            id="confirm-on-impact"
+            type="checkbox"
+            checked={config.confirmOnImpact}
+            onChange={(e) => setConfig({ confirmOnImpact: e.target.checked })}
+            className="accent-emerald-500"
+          />
+          <label htmlFor="confirm-on-impact" className="text-sm text-zinc-300">
+            Alerte instantanée sur impact
+          </label>
+        </div>
+
         {/* Min Sample Hz */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -200,7 +214,8 @@ export default function Settings() {
         <p className="text-xs leading-relaxed">
           💡 <strong>Conseil:</strong> Si la détection est trop sensible (fausses alertes),
           augmente les seuils d'impact (G) et de rotation. Si elle n'est pas assez sensible,
-          diminue-les. Tous les changements sont sauvegardés automatiquement.
+          diminue-les. L'option "alerte instantanée" force la notification dès le premier choc.
+          Tous les changements sont sauvegardés automatiquement.
         </p>
       </div>
 

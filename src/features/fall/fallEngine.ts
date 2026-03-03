@@ -47,8 +47,8 @@ export class FallEngine {
       g: 9.80665,
 
       freefallG: 0.6,
-      impactG: 1.8,
-      impactGyroDps: 120,
+      impactG: 1.3,
+      impactGyroDps: 100,
 
       freefallWindowMs: 900,
       stillnessWindowMs: 3000,

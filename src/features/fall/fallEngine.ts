@@ -47,8 +47,8 @@ export class FallEngine {
       g: 9.80665,
 
       freefallG: 0.6,
-      impactG: 0.8,        // absolute minimum - detects any brisk movement
-      impactGyroDps: 40,   // absolute minimum - detects any rotation
+      impactG: 1.4,        // balanced: not too sensitive
+      impactGyroDps: 80,   // balanced: catches real falls, filters jitter
 
       freefallWindowMs: 900,
       stillnessWindowMs: 3000,

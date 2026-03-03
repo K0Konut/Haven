@@ -68,6 +68,9 @@ export const useFallStore = create<FallState>((set) => {
     /* ignore */
   }
 
+  const safeImpactG = Math.max(1.8, persistedConfig?.impactG ?? 1.8);
+  const safeImpactGyroDps = Math.max(120, persistedConfig?.impactGyroDps ?? 120);
+
   return {
     enabled: persistedEnabled,
     status: "idle",
@@ -83,11 +86,14 @@ export const useFallStore = create<FallState>((set) => {
       warmupMs: 2500,
       cooldownMs: 20000,
       minSampleHz: 10,
-      impactG: 1.4,
-      impactGyroDps: 80,
+      impactG: safeImpactG,
+      impactGyroDps: safeImpactGyroDps,
       freefallG: 0.6,
-      confirmOnImpact: true,
+      confirmOnImpact: false,
       ...persistedConfig,
+      impactG: safeImpactG,
+      impactGyroDps: safeImpactGyroDps,
+      confirmOnImpact: false,
     },
     debug: persistedDebug,
 

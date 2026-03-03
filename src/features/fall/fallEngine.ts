@@ -47,8 +47,8 @@ export class FallEngine {
       g: 9.80665,
 
       freefallG: 0.6,
-      impactG: 1.4,        // balanced: not too sensitive
-      impactGyroDps: 80,   // balanced: catches real falls, filters jitter
+      impactG: 1.8,
+      impactGyroDps: 120,
 
       freefallWindowMs: 900,
       stillnessWindowMs: 3000,

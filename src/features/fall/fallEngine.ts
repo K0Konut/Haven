@@ -85,7 +85,9 @@ export class FallEngine {
     const recentFreefall =
       this.lastFreefallAt != null && (s.t - this.lastFreefallAt) <= this.cfg.freefallWindowMs;
 
-    const impact = gMag >= impactG && gyroMag >= impactGyroDps;
+    const impactByCombo = gMag >= impactG && gyroMag >= impactGyroDps;
+    const hardImpactOnly = gMag >= impactG + 0.35;
+    const impact = impactByCombo || hardImpactOnly;
 
     if (impact) {
       this.impactAt = s.t;
@@ -94,7 +96,10 @@ export class FallEngine {
       // confidence: freefall + strong impact
       const confidence = Math.min(
         1,
-        (recentFreefall ? 0.55 : 0.25) + Math.min(0.45, (gMag - impactG) * 0.18) + Math.min(0.20, gyroMag / 900)
+        (recentFreefall ? 0.55 : 0.28)
+          + Math.min(0.40, Math.max(0, gMag - impactG) * 0.30)
+          + Math.min(0.18, gyroMag / 900)
+          + (hardImpactOnly ? 0.12 : 0)
       );
 
       return { type: "POSSIBLE_FALL", confidence };

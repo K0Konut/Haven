@@ -115,7 +115,13 @@ export function useFallDetection(opts: Options = {}) {
           if (hz < minSampleHz) return;
         }
 
-        // Anti pocket/handling: too many big gyro spikes => ignore frames
+        const accelG = mag3(
+          ev.accelerationIncludingGravity?.x ?? 0,
+          ev.accelerationIncludingGravity?.y ?? 0,
+          ev.accelerationIncludingGravity?.z ?? 0
+        ) / 9.80665;
+
+        // Anti pocket/handling: too many big gyro spikes => ignore only low-impact frames
         // DISABLED in aggressive mode (confirmOnImpact) - we want to detect ANY movement
         if (!config.confirmOnImpact) {
           const gyroMag = mag3(
@@ -127,7 +133,7 @@ export function useFallDetection(opts: Options = {}) {
           if (gyroMag > 650) gyroSpikeCountRef.current += 1;
           else gyroSpikeCountRef.current = Math.max(0, gyroSpikeCountRef.current - 1);
 
-          if (gyroSpikeCountRef.current >= 4) return;
+          if (gyroSpikeCountRef.current >= 4 && accelG < config.impactG * 0.9) return;
         }
 
         const s = {
@@ -149,8 +155,8 @@ export function useFallDetection(opts: Options = {}) {
         if (out.type === "POSSIBLE_FALL") {
           setStatus("possible");
           setConfidence(out.confidence);
-          // in debug/aggressive mode we trigger immediately
-          if (config.confirmOnImpact || debug) {
+          // in debug/aggressive mode or high-confidence impact we trigger immediately
+          if (config.confirmOnImpact || debug || out.confidence >= 0.72) {
             firedRef.current = false;
             startCountdown(countdownSeconds);
           }

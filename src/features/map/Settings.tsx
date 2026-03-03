@@ -1,12 +1,29 @@
 import { useFallStore } from "../../store/fall.slice";
+import FallDebugPanel from "../fall/FallDebugPanel";
 
 export default function Settings() {
   const config = useFallStore((s) => s.config);
   const setConfig = useFallStore((s) => s.setConfig);
+  const debug = useFallStore((s) => s.debug);
+  const setDebug = useFallStore((s) => s.setDebug);
 
   return (
     <section className="space-y-6">
-      <h2 className="text-2xl font-bold">Réglages</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Réglages</h2>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={debug}
+            onChange={(e) => setDebug(e.target.checked)}
+            className="accent-red-500"
+          />
+          <span className="text-xs text-zinc-400">Debug</span>
+        </label>
+      </div>
+
+      {/* Debug Panel - always show at top if debug enabled */}
+      {debug && <FallDebugPanel />}
 
       {/* Fall Detection Settings */}
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-4">

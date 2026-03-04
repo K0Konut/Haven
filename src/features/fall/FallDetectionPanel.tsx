@@ -192,7 +192,7 @@ export default function FallDetectionPanel() {
         }
         // Préparation des paramètres pour EmailJS
         const templateParams = {
-          to_email: c.phone,
+          to_email: c.email,
           message: c.message,
           location: fix ? `${fix.lat}, ${fix.lng}` : "Non disponible"
         };

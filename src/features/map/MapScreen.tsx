@@ -20,6 +20,7 @@ import {
 import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { loadNavSession, saveNavSession } from "../../services/navigation/persistence";
+import { useStatsStore } from "../../store/stats.slice";
 
 type SelectedDestination = { label: string; center: LatLng };
 
@@ -95,6 +96,9 @@ export default function MapScreen() {
 
   // restore guard
   const hasRestoredSessionRef = useRef(false);
+
+  // track remaining distance for stats on manual stop
+  const remainingDistanceRef = useRef<number | null>(null);
 
   // UX: toast "navigation reprise"
   const [resumeBannerLabel, setResumeBannerLabel] = useState<string | null>(null);
@@ -247,6 +251,16 @@ export default function MapScreen() {
     setRemainingDistance(null);
     setRemainingDuration(null);
 
+    // save stats on manual stop
+    if (navStartAtRef.current != null) {
+      const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
+      const sel = useRoutingStore.getState().selected();
+      if (sel) {
+        const traveled = Math.max(0, sel.summary.distanceMeters - (remainingDistanceRef.current ?? sel.summary.distanceMeters));
+        useStatsStore.getState().addRide(traveled, elapsedSec);
+      }
+    }
+
     navStartAtRef.current = null;
     setHasArrived(false);
     setNavActualDurationSec(null);
@@ -390,6 +404,7 @@ export default function MapScreen() {
 
         setDistanceToRoute(distance);
         setRemainingDistance(rem);
+        remainingDistanceRef.current = rem;
         setRemainingDuration(etaSec);
 
         nav.update({
@@ -485,6 +500,10 @@ export default function MapScreen() {
         if (navStartAtRef.current != null) {
           const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
           setNavActualDurationSec(elapsedSec);
+          if (selected) {
+            useStatsStore.getState().addRide(selected.summary.distanceMeters, elapsedSec);
+          }
+          navStartAtRef.current = null; // évite double-comptage dans stopNavigation
         }
         setHasArrived(true);
 

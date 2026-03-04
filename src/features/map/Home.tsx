@@ -370,12 +370,12 @@ export default function Home() {
         </div>
       </div>
 
-      {lastRideLabel && (
-        <div className="rounded-2xl p-4 space-y-2" style={{ background: 'rgba(88, 28, 135, 0.15)', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
-          <div className="text-sm font-semibold text-purple-200">🕐 Dernière balade</div>
-          <div className="text-sm text-zinc-300">{lastRideLabel}</div>
+      <div className="rounded-2xl p-4 space-y-2" style={{ background: 'rgba(88, 28, 135, 0.15)', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
+        <div className="text-sm font-semibold text-purple-200">🕐 Dernière balade</div>
+        <div className="text-sm text-zinc-300">
+          {lastRideLabel ?? "Aucune balade enregistrée pour l'instant."}
         </div>
-      )}
+      </div>
     </section>
   );
 }

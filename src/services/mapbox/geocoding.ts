@@ -25,12 +25,19 @@ export async function geocodeForward(query: string, proximity?: LatLng): Promise
   const params: Record<string, string> = {
     access_token: token,
     language: "fr",
-    limit: "6",
+    limit: "8",
     autocomplete: "true",
-    types: "address,place,poi",
+    types: "poi,address,locality,neighborhood,place",
+    country:"fr",
+    fuzzyMatch: "true",
   };
-
-  if (proximity) params.proximity = `${proximity.lng},${proximity.lat}`;
+   
+  if (proximity) {
+    params.proximity = `${proximity.lng},${proximity.lat}`;
+  }
+  else {
+    params.proximity = "2.3488,48.8534"; // Paris par defaut
+  }
   url.search = new URLSearchParams(params).toString();
 
   const data = await fetchJson<MapboxGeocodingResponse>(url.toString());

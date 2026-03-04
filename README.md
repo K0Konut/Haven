@@ -1,4 +1,4 @@
-<h1 align="center">SOFTRIDE</h1>
+<h1 align="center">HAVEN</h1>
 
 <p align="center">
   <em>Empowering seamless, safe, and accelerated journeys.</em>

@@ -31,5 +31,5 @@ export async function sendEmergencyAlert(params: {
 
   // Capacitor: un simple changement d’URL ouvre l’app SMS sur mobile
   // (en web desktop ça ne marche pas toujours, mais sur mobile oui).
-  window.location.href = buildSmsUrl(contact.email, body);
+  window.location.href = buildSmsUrl(contact.phone, body);
 }

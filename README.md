@@ -145,11 +145,15 @@ src/
   - expiration: 45 minutes
 
 ## 10. Documentation detaillee
-Voir `docs/ARCHITECTURE.md` pour:
-- details par module/store/service,
-- logique de scoring d'itineraires,
-- fonctionnement du moteur de chute,
-- recommandations d'extension.
+- `docs/ARCHITECTURE.md`
+  - details par module/store/service
+  - logique de scoring d'itineraires
+  - fonctionnement du moteur de chute
+  - recommandations d'extension
+- `docs/GLOSSARY.md`
+  - definitions des concepts cles (ex: `RouteCandidate`, `safetyScore`, `FallEngine`)
+- `CONTRIBUTING.md`
+  - workflow de contribution (branches, commits, PR, checks avant merge)
 
 ## 11. Depannage rapide
 - Carte non chargee:

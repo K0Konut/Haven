@@ -43,7 +43,7 @@ export default function AppShell() {
 
         stopWatch = watchPosition((newFix) => {
           setFix(newFix);
-        }, (err) => {
+        }, (_err) => {
           // ignore watch errors for now
           // console.error('watchPosition error', err);
         });

@@ -15,112 +15,6 @@ import {
 import { saveNavSession } from "../../services/navigation/persistence";
 import { sendEmergencyEmail } from "../../services/emergency/email";
 import { useLocationStore } from "../../store/location.slice";
-
-export default function Home() {
-  const navigate = useNavigate();
-  const fix = useLocationStore((s) => s.fix);
-
-  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
-  const [favorites, setFavorites] = useState<Favorite[]>([]);
-  const [showAddressPanel, setShowAddressPanel] = useState(false);
-  const [addressQuery, setAddressQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
-  const [favName, setFavName] = useState("");
-  const [favStatus, setFavStatus] = useState<string | null>(null);
-  const [emergencyStatus, setEmergencyStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const c = await loadEmergencyContacts();
-      setContacts(c);
-      const fav = await loadFavorites();
-      setFavorites(fav);
-    })();
-  }, []);
-
-  async function refreshFavorites() {
-    const fav = await loadFavorites();
-    setFavorites(fav);
-  }
-  // address autocomplete (debounced)
-  useEffect(() => {
-    if (!showAddressPanel) return;
-    if (!addressQuery || addressQuery.trim().length < 3) {
-      setSuggestions([]);
-      setSuggestionsLoading(false);
-      return;
-    }
-    setSuggestionsLoading(true);
-    const t = setTimeout(async () => {
-      try {
-        const res = await geocodeForward(addressQuery.trim(), fix ?? undefined);
-        setSuggestions(res ?? []);
-      } catch (e) {
-        console.error("geocodeForward failed", e);
-        setSuggestions([]);
-      } finally {
-        setSuggestionsLoading(false);
-      }
-    }, 420);
-    return () => clearTimeout(t);
-  }, [addressQuery, showAddressPanel, fix]);
-
-  async function handleStartFavorite(f: Favorite) {
-    // persist a nav session and navigate to map where MapScreen restores it
-    // use the stored address as the searchable label if available
-    saveNavSession({
-      version: 1,
-      savedAt: Date.now(),
-      destination: { label: f.address ? f.address : f.label, center: f.center },
-    });
-    navigate("/map");
-  }
-
-  // removed: adding favorite by current position is no longer supported
-
-  async function handleRemoveFavorite(id: string) {
-    // delete without browser confirm popup (immediate)
-    try {
-      await removeFavorite(id);
-      await refreshFavorites();
-      setFavStatus("✅ Favori supprimé.");
-    } catch (e) {
-      console.error(e);
-      setFavStatus("❌ Impossible de supprimer le favori.");
-    }
-  }
-
-  async function handleSos() {
-    setEmergencyStatus(null);
-    if (!contacts || contacts.length === 0) {
-      setEmergencyStatus("⚠️ Aucun contact d'urgence configuré. Définis-les dans Réglages.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      let sent = 0;
-      let failed = 0;
-      for (const ct of contacts) {
-        try {
-          await sendEmergencyEmail({ contact: ct, currentLocation: fix ?? null });
-          sent++;
-        } catch (err) {
-          console.error("sendEmergencyEmail failed for", ct, err);
-          failed++;
-        }
-      }
-      setEmergencyStatus(`✅ Envoyé: ${sent}, Échecs: ${failed}`);
-    } catch (e) {
-      console.error(e);
-      setEmergencyStatus("❌ Erreur envoi SOS. Vérifie la configuration.");
-    } finally {
-      setLoading(false);
-    }
-  }
 import { useStatsStore } from "../../store/stats.slice";
 
 function formatLastRide(lastRide: { date: string; distanceMeters: number; durationSec: number } | null) {
@@ -149,29 +43,123 @@ function getGreeting(): { text: string; emoji: string } {
 
 function getSubtitle(): string {
   const hour = new Date().getHours();
-if (hour >= 5 && hour < 12) return "Prêt pour une balade matinale ?";
+  if (hour >= 5 && hour < 12) return "Prêt pour une balade matinale ?";
   if (hour >= 12 && hour < 14) return "Une balade après le déjeuner ?";
   if (hour >= 14 && hour < 18) return "Prêt pour une balade ?";
   if (hour >= 18 && hour < 22) return "Une petite balade ce soir ?";
   return "Une balade nocturne ?";
 }
 
-
 export default function Home() {
   const navigate = useNavigate();
+  const fix = useLocationStore((s) => s.fix);
   const { totalDistanceMeters, totalDurationSec, totalRides, lastRide } = useStatsStore();
+
+  const [contacts, setContacts] = useState<EmergencyContact[]>([]);
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [showAddressPanel, setShowAddressPanel] = useState(false);
+  const [addressQuery, setAddressQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
+  const [favName, setFavName] = useState("");
+  const [favStatus, setFavStatus] = useState<string | null>(null);
+  const [emergencyStatus, setEmergencyStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const totalKm = (totalDistanceMeters / 1000).toFixed(1);
   const totalMin = Math.round(totalDurationSec / 60);
   const lastRideLabel = formatLastRide(lastRide);
   const greeting = getGreeting();
 
+  useEffect(() => {
+    (async () => {
+      const c = await loadEmergencyContacts();
+      setContacts(c);
+      const fav = await loadFavorites();
+      setFavorites(fav);
+    })();
+  }, []);
+
+  async function refreshFavorites() {
+    const fav = await loadFavorites();
+    setFavorites(fav);
+  }
+
+  useEffect(() => {
+    if (!showAddressPanel) return;
+    if (!addressQuery || addressQuery.trim().length < 3) {
+      setSuggestions([]);
+      setSuggestionsLoading(false);
+      return;
+    }
+    setSuggestionsLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await geocodeForward(addressQuery.trim(), fix ?? undefined);
+        setSuggestions(res ?? []);
+      } catch (e) {
+        console.error("geocodeForward failed", e);
+        setSuggestions([]);
+      } finally {
+        setSuggestionsLoading(false);
+      }
+    }, 420);
+    return () => clearTimeout(t);
+  }, [addressQuery, showAddressPanel, fix]);
+
+  async function handleStartFavorite(f: Favorite) {
+    saveNavSession({
+      version: 1,
+      savedAt: Date.now(),
+      destination: { label: f.address ? f.address : f.label, center: f.center },
+    });
+    navigate("/map");
+  }
+
+  async function handleRemoveFavorite(id: string) {
+    try {
+      await removeFavorite(id);
+      await refreshFavorites();
+      setFavStatus("✅ Favori supprimé.");
+    } catch (e) {
+      console.error(e);
+      setFavStatus("❌ Impossible de supprimer le favori.");
+    }
+  }
+
+  async function handleSos() {
+    setEmergencyStatus(null);
+    if (!contacts || contacts.length === 0) {
+      setEmergencyStatus("⚠️ Aucun contact d'urgence configuré. Définis-les dans Réglages.");
+      return;
+    }
+    setLoading(true);
+    try {
+      let sent = 0;
+      let failed = 0;
+      for (const ct of contacts) {
+        try {
+          await sendEmergencyEmail({ contact: ct, currentLocation: fix ?? null });
+          sent++;
+        } catch (err) {
+          console.error("sendEmergencyEmail failed for", ct, err);
+          failed++;
+        }
+      }
+      setEmergencyStatus(`✅ Envoyé: ${sent}, Échecs: ${failed}`);
+    } catch (e) {
+      console.error(e);
+      setEmergencyStatus("❌ Erreur envoi SOS. Vérifie la configuration.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <section className="space-y-4">
       <header>
-        <h2 className="text-2xl font-bold">👋 Bonjour !</h2>
-        <p className="text-sm text-zinc-400">Prêt pour une balade ?</p>
-      <h2 className="text-2xl font-bold"> {greeting.text} !</h2>
+        <h2 className="text-2xl font-bold">{greeting.emoji} {greeting.text} !</h2>
         <p className="text-sm text-zinc-400">{getSubtitle()}</p>
       </header>
 
@@ -190,8 +178,8 @@ export default function Home() {
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-semibold text-zinc-100">🆘 Contact d’urgence</div>
-            <div className="text-xs text-zinc-400">Envoie un email d’alerte avec ta position</div>
+            <div className="text-sm font-semibold text-zinc-100">🆘 Contact d'urgence</div>
+            <div className="text-xs text-zinc-400">Envoie un email d'alerte avec ta position</div>
           </div>
         </div>
 
@@ -211,7 +199,7 @@ export default function Home() {
         <div className="flex gap-2">
           <button
             onClick={handleSos}
-            disabled={( !contacts || contacts.length === 0 ) || loading}
+            disabled={(!contacts || contacts.length === 0) || loading}
             className="flex-1 rounded-xl border border-rose-600 bg-rose-600/10 px-4 py-3 text-sm font-semibold text-rose-200 hover:bg-rose-600/20 disabled:opacity-50"
           >
             🔴 SOS — Envoyer alerte
@@ -232,24 +220,23 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Favorites */}
       <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold text-zinc-100">⭐ Favoris</div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setShowAddressPanel((s) => !s);
-                setAddressQuery("");
-                setSuggestions([]);
-                setSelectedPlace(null);
-                setFavName("");
-                setFavStatus(null);
-              }}
-              className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-200 hover:bg-sky-500/15"
-            >
-              + Par adresse
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              setShowAddressPanel((s) => !s);
+              setAddressQuery("");
+              setSuggestions([]);
+              setSelectedPlace(null);
+              setFavName("");
+              setFavStatus(null);
+            }}
+            className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-xs text-sky-200 hover:bg-sky-500/15"
+          >
+            + Par adresse
+          </button>
         </div>
 
         {showAddressPanel && (
@@ -272,7 +259,6 @@ export default function Home() {
                         onClick={() => {
                           setSelectedPlace(s);
                           setAddressQuery(s.label);
-                          // do NOT auto-fill the favorite name; let the user enter a custom name
                           setSuggestions([]);
                         }}
                         className="cursor-pointer px-2 py-1 hover:bg-zinc-800"
@@ -306,7 +292,7 @@ export default function Home() {
                   if (!selectedPlace) return setFavStatus("⚠️ Choisis d'abord une adresse dans la liste.");
                   if (!favName || !favName.trim()) return setFavStatus("⚠️ Donne un nom pour le favori.");
                   const fav = {
-                    id: `fav_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+                    id: `fav_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
                     label: favName.trim(),
                     address: selectedPlace.label,
                     center: selectedPlace.center,
@@ -362,26 +348,10 @@ export default function Home() {
           ))}
         </div>
 
-        <hr className="border-zinc-800/40" />
-
         {favStatus && <div className="text-xs text-zinc-300">{favStatus}</div>}
-
-        <div className="text-sm font-semibold text-zinc-100">📊 Vos statistiques</div>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border border-zinc-800 bg-black/30 p-3 text-center">
-            <div className="text-lg font-bold text-zinc-100">12.5</div>
-            <div className="text-xs text-zinc-400">km</div>
-          </div>
-          <div className="rounded-xl border border-zinc-800 bg-black/30 p-3 text-center">
-            <div className="text-lg font-bold text-zinc-100">45</div>
-            <div className="text-xs text-zinc-400">min</div>
-          </div>
-          <div className="rounded-xl border border-zinc-800 bg-black/30 p-3 text-center">
-            <div className="text-lg font-bold text-zinc-100">3</div>
-            <div className="text-xs text-zinc-400">trajets</div>
-          </div>
-        </div>
       </div>
+
+      {/* Stats persistantes (Zustand) */}
       <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(88, 28, 135, 0.15)', border: '1px solid rgba(168, 85, 247, 0.2)', boxShadow: '0 0 20px rgba(139, 0, 255, 0.08)' }}>
         <div className="text-sm font-semibold text-purple-200">📊 Vos statistiques</div>
         <div className="grid grid-cols-3 gap-3">

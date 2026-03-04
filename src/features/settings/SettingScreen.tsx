@@ -180,7 +180,7 @@ export default function SettingsScreen() {
             <div className="text-xs text-zinc-400">Nom</div>
             <input
               value={editing?.name ?? ""}
-              onChange={(e) => setEditing((ed) => ({ ...(ed ?? {}), name: e.target.value }))}
+              onChange={(e) => setEditing((ed) => ({ ...(ed ?? { email: "", message: "" }), name: e.target.value } as EmergencyContact))}
               placeholder="Nom du contact (ex: Maman)"
               className="w-full rounded-xl border border-zinc-800 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-500/60"
             />
@@ -189,7 +189,7 @@ export default function SettingsScreen() {
               <span className="text-xs text-zinc-400">Email</span>
               <input
                 value={editing?.email ?? ""}
-                onChange={(e) => setEditing((ed) => ({ ...(ed ?? {}), email: e.target.value }))}
+                onChange={(e) => setEditing((ed) => ({ ...(ed ?? { email: "", message: "" }), email: e.target.value } as EmergencyContact))}
                 placeholder="exemple@email.com"
                 className="w-full rounded-xl border border-zinc-800 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-500/60"
               />
@@ -202,7 +202,7 @@ export default function SettingsScreen() {
               <span className="text-xs text-zinc-400">Message</span>
               <textarea
                 value={editing?.message ?? DEFAULT_MSG}
-                onChange={(e) => setEditing((ed) => ({ ...(ed ?? {}), message: e.target.value }))}
+                onChange={(e) => setEditing((ed) => ({ ...(ed ?? { email: "", message: "" }), message: e.target.value } as EmergencyContact))}
                 rows={3}
                 className="w-full rounded-xl border border-zinc-800 bg-black/30 px-3 py-2 text-sm outline-none focus:border-sky-500/60"
               />

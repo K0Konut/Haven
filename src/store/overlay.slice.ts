@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export type OverlayState = {
   showHazards: boolean;
@@ -7,9 +8,16 @@ export type OverlayState = {
   toggleParkings: () => void;
 };
 
-export const useOverlayStore = create<OverlayState>((set) => ({
-  showHazards: true,
-  showParkings: true,
-  toggleHazards: () => set((s) => ({ showHazards: !s.showHazards })),
-  toggleParkings: () => set((s) => ({ showParkings: !s.showParkings })),
-}));
+export const useOverlayStore = create<OverlayState>()(
+  persist(
+    (set) => ({
+      showHazards: true,
+      showParkings: true,
+      toggleHazards: () => set((s) => ({ showHazards: !s.showHazards })),
+      toggleParkings: () => set((s) => ({ showParkings: !s.showParkings })),
+    }),
+    {
+      name: "overlay-storage",
+    }
+  )
+);

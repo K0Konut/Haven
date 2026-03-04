@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import type { Feature, FeatureCollection, LineString } from "geojson";
 import type { LatLng } from "../../types/routing";
+import type { Hazard, ParkingSpot } from "../../types/map";
 import { requireMapboxToken } from "../../app/config/env";
 
 type Props = {
@@ -19,6 +20,14 @@ type Props = {
 
   // markers
   destination?: LatLng | null;
+
+  // extras
+  hazards?: Hazard[];
+  parkings?: ParkingSpot[];
+
+  /** toggle display */
+  hazardsVisible?: boolean;
+  parkingsVisible?: boolean;
 };
 
 const SRC_SELECTED = "softride-route-selected";
@@ -26,6 +35,12 @@ const LYR_SELECTED = "softride-route-selected-line";
 
 const SRC_ALTS = "softride-route-alts";
 const LYR_ALTS = "softride-route-alts-line";
+
+const SRC_HAZARDS = "softride-hazards";
+const LYR_HAZARDS = "softride-hazards-circle";
+
+const SRC_PARKING = "softride-parking";
+const LYR_PARKING = "softride-parking-circle";
 
 const emptyLines: FeatureCollection<LineString> = { type: "FeatureCollection", features: [] };
 
@@ -55,6 +70,12 @@ export default function MapView({
   alternativeRoutes = [],
 
   destination,
+
+  hazards = [],
+  parkings = [],
+
+  hazardsVisible = true,
+  parkingsVisible = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -109,6 +130,12 @@ export default function MapView({
       if (!map.getSource(SRC_ALTS)) map.addSource(SRC_ALTS, { type: "geojson", data: emptyLines });
       if (!map.getSource(SRC_SELECTED)) map.addSource(SRC_SELECTED, { type: "geojson", data: emptyLines });
 
+      // extras sources
+      if (!map.getSource(SRC_HAZARDS))
+        map.addSource(SRC_HAZARDS, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      if (!map.getSource(SRC_PARKING))
+        map.addSource(SRC_PARKING, { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+
       if (!map.getLayer(LYR_ALTS)) {
         map.addLayer({
           id: LYR_ALTS,
@@ -137,6 +164,53 @@ export default function MapView({
           },
         });
       }
+
+      // hazard layer
+      if (!map.getLayer(LYR_HAZARDS)) {
+        map.addLayer({
+          id: LYR_HAZARDS,
+          type: "circle",
+          source: SRC_HAZARDS,
+          paint: {
+            "circle-radius": 6,
+            "circle-color": "#dc2626",
+            "circle-opacity": 0.8,
+          },
+        });
+      }
+
+      // parking layer
+      if (!map.getLayer(LYR_PARKING)) {
+        map.addLayer({
+          id: LYR_PARKING,
+          type: "circle",
+          source: SRC_PARKING,
+          paint: {
+            "circle-radius": 5,
+            "circle-color": "#3b82f6",
+            "circle-opacity": 0.7,
+          },
+        });
+      }
+
+      // hover/click for extras
+      map.on('mouseenter', LYR_HAZARDS, () => (map.getCanvas().style.cursor = 'pointer'));
+      map.on('mouseleave', LYR_HAZARDS, () => (map.getCanvas().style.cursor = ''));
+      map.on('click', LYR_HAZARDS, (e) => {
+        const prop = e.features?.[0]?.properties as Record<string, string | undefined>;
+        const text = prop?.type ? `Danger: ${prop.type}` : 'Danger signalé';
+        new mapboxgl.Popup().setLngLat(e.lngLat).setText(text).addTo(map);
+      });
+
+      map.on('mouseenter', LYR_PARKING, () => (map.getCanvas().style.cursor = 'pointer'));
+      map.on('mouseleave', LYR_PARKING, () => (map.getCanvas().style.cursor = ''));
+      map.on('click', LYR_PARKING, (e) => {
+        const prop = e.features?.[0]?.properties as Record<string, string | undefined>;
+        const text = prop?.type
+          ? `Parking ${prop.type}`
+          : 'Emplacement de stationnement';
+        new mapboxgl.Popup().setLngLat(e.lngLat).setText(text).addTo(map);
+      });
 
       // applique les routes “en attente” (si MapScreen a déjà calculé avant load)
       const alts = map.getSource(SRC_ALTS) as mapboxgl.GeoJSONSource | undefined;
@@ -197,6 +271,14 @@ export default function MapView({
     } else {
       destMarkerRef.current.setLngLat(lngLat);
     }
+    // center the map on destination when it changes (programmatic move)
+    try {
+      programmaticMoveRef.current = true;
+      map.easeTo({ center: lngLat, duration: 450, essential: true });
+      map.once("moveend", () => (programmaticMoveRef.current = false));
+    } catch {
+      programmaticMoveRef.current = false;
+    }
   }, [destination]);
 
 
@@ -229,6 +311,56 @@ export default function MapView({
       map.once("moveend", () => (programmaticMoveRef.current = false));
     }
   }, [selectedRoute, alternativeRoutes, followUser]);
+
+  // extras: update hazards/parkings layers when data changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const src = map.getSource(SRC_HAZARDS) as mapboxgl.GeoJSONSource | undefined;
+    if (!src) return;
+    const data: FeatureCollection = {
+      type: "FeatureCollection",
+      features: hazards.map((h) => ({
+        type: "Feature",
+        properties: { type: h.type, id: h.id },
+        geometry: { type: "Point", coordinates: [h.center.lng, h.center.lat] },
+      } as Feature)),
+    };
+    src.setData(data);
+  }, [hazards]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const src = map.getSource(SRC_PARKING) as mapboxgl.GeoJSONSource | undefined;
+    if (!src) return;
+    const data: FeatureCollection = {
+      type: "FeatureCollection",
+      features: parkings.map((p) => ({
+        type: "Feature",
+        properties: { type: p.type, id: p.id },
+        geometry: { type: "Point", coordinates: [p.center.lng, p.center.lat] },
+      } as Feature)),
+    };
+    src.setData(data);
+  }, [parkings]);
+
+  // visibility flags control layer display
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    if (map.getLayer(LYR_HAZARDS)) {
+      map.setLayoutProperty(LYR_HAZARDS, 'visibility', hazardsVisible ? 'visible' : 'none');
+    }
+  }, [hazardsVisible]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    if (map.getLayer(LYR_PARKING)) {
+      map.setLayoutProperty(LYR_PARKING, 'visibility', parkingsVisible ? 'visible' : 'none');
+    }
+  }, [parkingsVisible]);
 
   // ✅ Navigation camera: suit l'utilisateur en douceur + bearing = heading
   useEffect(() => {

@@ -1,23 +1,16 @@
-import { requireMapboxToken } from "../../app/config/env";
 import { fetchJson } from "./http";
 import type { LatLng } from "../../types/routing";
+
+const token = import.meta.env.VITE_MAPBOX_TOKEN as string;
 
 export type PlaceResult = {
   id: string;
   label: string;
+  context?: string;
   center: LatLng;
 };
 
-type MapboxGeocodingResponse = {
-  features: Array<{
-    id: string;
-    place_name: string;
-    center: [number, number]; // [lng, lat]
-  }>;
-};
-
 export async function geocodeForward(query: string, proximity?: LatLng): Promise<PlaceResult[]> {
-  const token = requireMapboxToken();
   const q = query.trim();
   if (!q) return [];
 
@@ -25,19 +18,27 @@ export async function geocodeForward(query: string, proximity?: LatLng): Promise
   const params: Record<string, string> = {
     access_token: token,
     language: "fr",
-    limit: "6",
+    limit: "8",
     autocomplete: "true",
-    types: "address,place,poi",
+    types: "poi,address,locality,neighborhood,place",
+    country: "fr",
+    fuzzyMatch: "true",
   };
 
-  if (proximity) params.proximity = `${proximity.lng},${proximity.lat}`;
+  if (proximity) {
+    params.proximity = `${proximity.lng},${proximity.lat}`;
+  } else {
+    params.proximity = "2.3488,48.8534"; // Paris par défaut
+  }
+
   url.search = new URLSearchParams(params).toString();
 
-  const data = await fetchJson<MapboxGeocodingResponse>(url.toString());
+  const data = await fetchJson<any>(url.toString());
 
-  return (data.features ?? []).map((f) => ({
+  return (data.features ?? []).map((f: any) => ({
     id: f.id,
     label: f.place_name,
+    context: f.context?.[0]?.text ?? undefined,
     center: { lng: f.center[0], lat: f.center[1] },
   }));
 }

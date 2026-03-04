@@ -196,3 +196,4 @@ export function useFallDetection(opts: Options = {}) {
 
   return { cancel: cancelCountdown };
 }
+

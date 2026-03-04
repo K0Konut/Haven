@@ -23,5 +23,5 @@ export async function openEmergencySms(params: {
   const { contact, currentLocation } = params;
 
   const body = `${contact.message}${locationBlock(currentLocation)}`;
-  window.location.href = smsUrl(contact.phone, body);
+  window.location.href = smsUrl(contact.email, body);
 }

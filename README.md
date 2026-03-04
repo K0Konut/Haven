@@ -1,10 +1,14 @@
-# SoftRide
+# Haven (anciennement SoftRide)
 
 Application de navigation velo cross-platform (web + mobile via Capacitor), avec:
 - calcul d'itineraires securises (Mapbox Directions + scoring),
 - guidage temps reel avec reroutage automatique,
 - detection de chute basee capteurs (accelerometre/gyroscope),
 - envoi d'alerte email au contact d'urgence (EmailJS).
+
+Note nommage:
+- Nom du repo/projet: `Haven`
+- Identifiants techniques encore presents dans le code: `SoftRide` (ex: `package.json`, `capacitor.config.ts`, cles de persistance)
 
 ## Table des matieres
 - [1. Stack technique](#1-stack-technique)
@@ -84,7 +88,10 @@ npm run cap:open:ios
 
 Config Capacitor: `capacitor.config.ts`
 - `appId`: `com.softride.app`
+- `appName`: `SoftRide`
 - `webDir`: `dist`
+
+Ces identifiants sont historiques et n'empechent pas l'utilisation du projet sous le nom `Haven`.
 
 ## 7. Architecture rapide
 ```text

@@ -1,9 +1,9 @@
-# Architecture SoftRide
+# Architecture Haven
 
 Ce document decrit l'architecture technique actuelle du projet, en se basant sur le code de `src/`.
 
 ## 1. Vue d'ensemble
-SoftRide est structure en couches:
+Haven est structure en couches:
 - `features/`: composants UI orientes ecrans/metiers.
 - `store/`: etat global (Zustand).
 - `services/`: logique technique (API, geodesie, permissions, persistance, alertes).

@@ -1,4 +1,4 @@
-# Glossaire SoftRide
+# Glossaire Haven
 
 Ce glossaire explique les principaux termes metier/techniques utilises dans le code.
 

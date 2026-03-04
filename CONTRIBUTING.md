@@ -1,4 +1,4 @@
-# Contribuer a SoftRide
+# Contribuer a Haven
 
 Ce document decrit le workflow de contribution attendu pour garder un historique Git lisible et une base code/doc maintenable.
 

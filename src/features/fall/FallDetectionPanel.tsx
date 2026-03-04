@@ -186,7 +186,7 @@ export default function FallDetectionPanel() {
 
       try {
         const c = await loadEmergencyContact();
-        if (!c?.phone) { // Vérifie l'email au lieu du téléphone
+        if (!c?.email) { // Vérifie l'email au lieu du téléphone
           alert("Aucun contact d’urgence configuré (Réglages).");
           return;
         }

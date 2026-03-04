@@ -3,6 +3,7 @@ import { Preferences } from "@capacitor/preferences";
 export type EmergencyContact = {
   email: string;   // ex: +33612345678
   message: string; // texte de base
+  phone: string;
 };
 
 const KEY = "softride.emergencyContact.v2";

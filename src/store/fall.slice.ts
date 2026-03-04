@@ -7,6 +7,12 @@ export type FallConfig = {
   warmupMs: number;
   cooldownMs: number;
   minSampleHz: number;
+  // Engine thresholds for advanced users
+  impactG: number;
+  impactGyroDps: number;
+  freefallG: number;
+  // whether to confirm on first impact (no stillness required)
+  confirmOnImpact: boolean;
 };
 
 type FallState = {
@@ -25,6 +31,9 @@ type FallState = {
   // Tunables
   config: FallConfig;
 
+  // developer helpers
+  debug: boolean;
+
   setEnabled: (v: boolean) => void;
   setStatus: (s: FallStatus) => void;
   setConfidence: (c: number | null) => void;
@@ -38,52 +47,100 @@ type FallState = {
   setLastAlertAt: (t: number | null) => void;
   setConfig: (patch: Partial<FallConfig>) => void;
 
+  setDebug: (v: boolean) => void;
+
   reset: () => void;
 };
 
-export const useFallStore = create<FallState>((set) => ({
-  enabled: false,
-  status: "idle",
-  lastConfidence: null,
+export const useFallStore = create<FallState>((set) => {
+  // read persisted state from localStorage (synchronous during init)
+  let persistedEnabled = false;
+  let persistedDebug = false;
+  let persistedConfig: Partial<FallConfig> | null = null;
+  try {
+    const e = localStorage.getItem("fall:enabled");
+    if (e != null) persistedEnabled = JSON.parse(e) as boolean;
+    const d = localStorage.getItem("fall:debug");
+    if (d != null) persistedDebug = JSON.parse(d) as boolean;
+    const c = localStorage.getItem("fall:config");
+    if (c) persistedConfig = JSON.parse(c);
+  } catch {
+    /* ignore */
+  }
 
-  countdownSec: 0,
-  countdownActive: false,
+  const safeImpactG = Math.max(1.1, persistedConfig?.impactG ?? 1.1);
+  const safeImpactGyroDps = Math.max(90, persistedConfig?.impactGyroDps ?? 90);
 
-  lastAlertAt: null,
+  return {
+    enabled: persistedEnabled,
+    status: "idle",
+    lastConfidence: null,
 
-  config: {
-    countdownSeconds: 15,
-    warmupMs: 2500,
-    cooldownMs: 20000,
-    minSampleHz: 10,
-  },
+    countdownSec: 0,
+    countdownActive: false,
 
-  setEnabled: (v) => set({ enabled: v }),
-  setStatus: (s) => set({ status: s }),
-  setConfidence: (c) => set({ lastConfidence: c }),
+    lastAlertAt: null,
 
-  startCountdown: (sec) =>
-    set({ countdownSec: sec, countdownActive: true, status: "countdown" }),
+    config: {
+      countdownSeconds: 15,
+      warmupMs: 2500,
+      cooldownMs: 20000,
+      minSampleHz: 10,
+      freefallG: 0.6,
+      ...persistedConfig,
+      impactG: safeImpactG,
+      impactGyroDps: safeImpactGyroDps,
+      confirmOnImpact: false,
+    },
+    debug: persistedDebug,
 
-  tick: () =>
-    set((s) => ({ countdownSec: Math.max(0, s.countdownSec - 1) })),
+    setEnabled: (v) => {
+      try { localStorage.setItem("fall:enabled", JSON.stringify(v)); } catch {
+        // noop (localStorage not available)
+      }
+      set({ enabled: v });
+    },
 
-  cancelCountdown: () =>
-    set({ countdownActive: false, countdownSec: 0, status: "listening" }),
+    setDebug: (v) => {
+      try { localStorage.setItem("fall:debug", JSON.stringify(v)); } catch {
+        // noop
+      }
+      set({ debug: v });
+    },
 
-  forceSendNow: () =>
-    set({ countdownSec: 0, countdownActive: true, status: "countdown" }),
+    setStatus: (s) => set({ status: s }),
 
-  setLastAlertAt: (t) => set({ lastAlertAt: t }),
+    setConfidence: (c) => set({ lastConfidence: c }),
 
-  setConfig: (patch) =>
-    set((s) => ({ config: { ...s.config, ...patch } })),
+    startCountdown: (sec) =>
+      set({ countdownSec: sec, countdownActive: true, status: "countdown" }),
 
-  reset: () =>
-    set({
-      status: "idle",
-      lastConfidence: null,
-      countdownActive: false,
-      countdownSec: 0,
-    }),
-}));
+    tick: () =>
+      set((s) => ({ countdownSec: Math.max(0, s.countdownSec - 1) })),
+
+    cancelCountdown: () =>
+      set({ countdownActive: false, countdownSec: 0, status: "listening" }),
+
+    forceSendNow: () =>
+      set({ countdownSec: 0, countdownActive: true, status: "countdown" }),
+
+    setLastAlertAt: (t) => set({ lastAlertAt: t }),
+
+    setConfig: (patch) =>
+      set((s) => {
+        const cfg = { ...s.config, ...patch };
+        try { localStorage.setItem("fall:config", JSON.stringify(cfg)); } catch {
+          // noop (localStorage not available)
+        }
+        return { config: cfg };
+      }),
+
+    reset: () =>
+      set({
+        status: "idle",
+        lastConfidence: null,
+        countdownActive: false,
+        countdownSec: 0,
+      }),
+  };
+});

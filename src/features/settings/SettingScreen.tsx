@@ -11,7 +11,7 @@ import { sendEmergencyEmail } from "../../services/emergency/email";
 import { useLocationStore } from "../../store/location.slice";
 
 const DEFAULT_MSG =
-  "🚨 SoftRide: chute potentielle détectée. Si je ne réponds pas, peux-tu me contacter ?";
+  "🚨 Haven: chute potentielle détectée. Si je ne réponds pas, peux-tu me contacter ?";
 
 export default function SettingsScreen() {
   const fix = useLocationStore((s) => s.fix);
@@ -19,6 +19,7 @@ export default function SettingsScreen() {
   const [contact, setContact] = useState<EmergencyContact>({
     email: "",
     message: DEFAULT_MSG,
+    phone: "",
   });
   const [status, setStatus] = useState<string | null>(null);
 
@@ -40,13 +41,14 @@ const emailOk = useMemo(() => contact.email.trim().length > 0, [contact.email]);
     await saveEmergencyContact({
       email: contact.email.trim(),
       message: contact.message?.trim() || DEFAULT_MSG,
+      phone: contact.phone.trim(),
     });
     setStatus("✅ Contact enregistré.");
   }
 
   async function handleClear() {
     await clearEmergencyContact();
-    setContact({ email: "", message: DEFAULT_MSG });
+    setContact({ email: "", message: DEFAULT_MSG, phone: "" });
     setStatus("✅ Contact supprimé.");
   }
 
@@ -60,11 +62,11 @@ async function handleTestEmail() {
 
     const msg =
       (contact.message?.trim() || DEFAULT_MSG) +
-      "\n\n✅ Test SoftRide : ceci est un message de test (pas une vraie alerte).";
+      "\n\n✅ Test Haven : ceci est un message de test (pas une vraie alerte).";
 
     try {
       await sendEmergencyEmail({
-        contact: { email, message: msg },
+        contact: { email, message: msg, phone: contact.phone.trim() },
         currentLocation: fix ?? null,
       });
       setStatus("✅ Email envoyé avec succès !");

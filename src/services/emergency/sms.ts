@@ -1,3 +1,9 @@
+/**
+ * @deprecated Ce service est déprécié.
+ * Utilisez email.ts et la fonction sendEmergencyEmail() à la place.
+ * Le SMS a été remplacé par l'envoi automatique d'email via EmailJS.
+ */
+
 import type { LatLng } from "../../types/routing";
 import type { EmergencyContact } from "./contact";
 

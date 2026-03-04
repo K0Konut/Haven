@@ -1,58 +1,22 @@
-/*import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { requestMotionPermission } from "../../services/permissions/motion";
 import { useFallStore } from "../../store/fall.slice";
-import { useFallDetection } from "./useFallDetection";
 import { loadEmergencyContact } from "../../services/emergency/contact";
-import { openEmergencySms } from "../../services/emergency/sms";
-import { useLocationStore } from "../../store/location.slice";
 
 export default function FallDetectionPanel() {
   const enabled = useFallStore((s) => s.enabled);
   const setEnabled = useFallStore((s) => s.setEnabled);
   const status = useFallStore((s) => s.status);
   const conf = useFallStore((s) => s.lastConfidence);
-  const countdownActive = useFallStore((s) => s.countdownActive);
-  const countdownSec = useFallStore((s) => s.countdownSec);
-  const forceSendNow = useFallStore((s) => s.forceSendNow);
-
-  const fix = useLocationStore((s) => s.fix);
 
   const [contactOk, setContactOk] = useState<boolean>(false);
-
-  // Prevent double-trigger (button + countdown reaching 0)
-  const sendingRef = useRef(false);
 
   useEffect(() => {
     (async () => {
       const c = await loadEmergencyContact();
-      setContactOk(!!c?.phone);
+      setContactOk(!!c?.email);
     })();
   }, []);
-
-  const config = useFallStore((s) => s.config);
-
-  const { cancel } = useFallDetection({
-    countdownSeconds: config.countdownSeconds,
-    warmupMs: config.warmupMs,
-    cooldownMs: config.cooldownMs,
-    minSampleHz: config.minSampleHz,
-    onConfirmed: async () => {
-      if (sendingRef.current) return;
-      sendingRef.current = true;
-
-      try {
-        const c = await loadEmergencyContact();
-        if (!c?.phone) {
-          alert("Aucun contact d’urgence configuré (Réglages).");
-          return;
-        }
-        await openEmergencySms({ contact: c, currentLocation: fix ?? null });
-      } finally {
-        // allow again for future detections
-        setTimeout(() => (sendingRef.current = false), 1500);
-      }
-    },
-  });
 
   async function toggle() {
     if (!enabled) {
@@ -62,8 +26,8 @@ export default function FallDetectionPanel() {
         return;
       }
       const c = await loadEmergencyContact();
-      setContactOk(!!c?.phone);
-      if (!c?.phone) {
+      setContactOk(!!c?.email);
+      if (!c?.email) {
         alert("Configure un contact d’urgence dans Réglages avant d’activer.");
         return;
       }
@@ -78,7 +42,7 @@ export default function FallDetectionPanel() {
           <div>
             <div className="text-sm font-semibold text-zinc-100">Détection de chute</div>
             <div className="text-xs text-zinc-400">
-              Impact + immobilité • ouvre un SMS vers le contact d’urgence
+              Impact + immobilité • envoie un email au contact d’urgence
             </div>
             {!contactOk && (
               <div className="mt-1 text-xs text-amber-300">
@@ -100,6 +64,11 @@ export default function FallDetectionPanel() {
 
         <div className="text-xs text-zinc-400">
           Statut: <span className="text-zinc-200">{status}</span>
+          {enabled && (
+            <>
+              {" • "}mode: <span className="text-zinc-200">actif en fond (trajet inclus)</span>
+            </>
+          )}
           {conf != null && (
             <>
               {" • "}confiance:{" "}
@@ -108,35 +77,6 @@ export default function FallDetectionPanel() {
           )}
         </div>
       </div>
-
-      {countdownActive && (
-        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur flex items-center justify-center p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-950 p-5 space-y-3">
-            <div className="text-lg font-bold text-zinc-100">Chute détectée</div>
-            <div className="text-sm text-zinc-300">
-              Ouverture du SMS dans{" "}
-              <span className="font-bold text-sky-300">{countdownSec}s</span>
-            </div>
-            <div className="text-xs text-zinc-400">Si tout va bien, annule maintenant.</div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={cancel}
-                className="flex-1 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm text-zinc-100 hover:bg-zinc-800"
-              >
-                Annuler
-              </button>
-
-              <button
-                onClick={forceSendNow}
-                className="rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm text-sky-200 hover:bg-sky-500/15"
-              >
-                Envoyer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

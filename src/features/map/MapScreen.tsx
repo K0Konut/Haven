@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ensureLocationPermission,
   getCurrentPosition,
@@ -12,6 +13,10 @@ import NavBanner from "./components/NavBanner";
 import { formatDistance, formatDuration } from "../../services/routing/format";
 import { geocodeForward, type PlaceResult } from "../../services/mapbox/geocoding";
 import type { LatLng } from "../../types/routing";
+import type { Hazard, ParkingSpot } from "../../types/map";
+import { fetchHazards } from "../../services/map/hazards";
+import { fetchParkingSpots } from "../../services/map/parking";
+import { useOverlayStore } from "../../store/overlay.slice";
 import {
   distanceToRouteMeters,
   remainingRouteDistanceMeters,
@@ -20,6 +25,7 @@ import {
 import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { loadNavSession, saveNavSession } from "../../services/navigation/persistence";
+import { useStatsStore } from "../../store/stats.slice";
 
 type SelectedDestination = { label: string; center: LatLng };
 
@@ -46,6 +52,7 @@ function gpsPillClass(q: GpsQuality) {
 
 export default function MapScreen() {
   const { permission, fix, setPermission, setFix } = useLocationStore();
+  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
   const routing = useRoutingStore();
@@ -64,12 +71,21 @@ export default function MapScreen() {
   const [searchError, setSearchError] = useState<string | null>(null);
 
   // UX toggles
-  const [autoRouting, setAutoRouting] = useState(true);
+  const [autoRouting] = useState(true); // always auto-start when selecting destination
+  const [avoidHighways, setAvoidHighways] = useState(false);
+
+  // extras visibility (global store)
+  const showHazards = useOverlayStore((s) => s.showHazards);
+  const showParkings = useOverlayStore((s) => s.showParkings);
 
   // Live metrics
   const [distanceToRoute, setDistanceToRoute] = useState<number | null>(null);
   const [remainingDistance, setRemainingDistance] = useState<number | null>(null);
   const [remainingDuration, setRemainingDuration] = useState<number | null>(null);
+
+  // extras: real‑time hazards & parking spots
+  const [hazards, setHazards] = useState<Hazard[]>([]);
+  const [parkings, setParkings] = useState<ParkingSpot[]>([]);
 
   const routeAbortRef = useRef<AbortController | null>(null);
   const stopWatchRef = useRef<null | (() => void)>(null);
@@ -96,6 +112,9 @@ export default function MapScreen() {
   // restore guard
   const hasRestoredSessionRef = useRef(false);
 
+  // track remaining distance for stats on manual stop
+  const remainingDistanceRef = useRef<number | null>(null);
+
   // UX: toast "navigation reprise"
   const [resumeBannerLabel, setResumeBannerLabel] = useState<string | null>(null);
 
@@ -119,6 +138,27 @@ export default function MapScreen() {
   const handleUserGesture = useCallback(() => {
     const s = useNavigationStore.getState();
     if (s.isNavigating) s.setFollowUser(false);
+  }, []);
+
+  // fetch hazards & parking every minute
+  useEffect(() => {
+    let mounted = true;
+    async function loadAll() {
+      try {
+        const [h, p] = await Promise.all([fetchHazards(), fetchParkingSpots()]);
+        if (!mounted) return;
+        setHazards(h);
+        setParkings(p);
+      } catch (e) {
+        console.warn("failed to load map extras", e);
+      }
+    }
+    loadAll();
+    const id = window.setInterval(loadAll, 60 * 1000);
+    return () => {
+      mounted = false;
+      window.clearInterval(id);
+    };
   }, []);
 
   // ✅ request notifications permission once (Android 13+ needs it)
@@ -178,7 +218,7 @@ export default function MapScreen() {
     try {
       setSearchError(null);
       setSearchLoading(true);
-      const r = await geocodeForward(query, fix ?? undefined);
+      const r = await geocodeForward(query);
       setResults(r);
     } catch (e) {
       setSearchError(e instanceof Error ? e.message : "Erreur recherche");
@@ -208,12 +248,16 @@ export default function MapScreen() {
         {
           origin: fix,
           destination: dest.center,
-          preference: { preferBikeLanes: 1, preferQuietStreets: 0.8 },
+          preference: {
+            preferBikeLanes: 1,
+            preferQuietStreets: 0.8,
+            avoidHighways: avoidHighways,
+          },
         },
         { signal: ac.signal }
       );
     },
-    [fix, routing]
+    [fix, routing, avoidHighways]
   );
 
     function setAsDestination(r: PlaceResult) {
@@ -247,6 +291,16 @@ export default function MapScreen() {
     setRemainingDistance(null);
     setRemainingDuration(null);
 
+    // save stats on manual stop
+    if (navStartAtRef.current != null) {
+      const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
+      const sel = useRoutingStore.getState().selected();
+      if (sel) {
+        const traveled = Math.max(0, sel.summary.distanceMeters - (remainingDistanceRef.current ?? sel.summary.distanceMeters));
+        useStatsStore.getState().addRide(traveled, elapsedSec);
+      }
+    }
+
     navStartAtRef.current = null;
     setHasArrived(false);
     setNavActualDurationSec(null);
@@ -258,7 +312,10 @@ export default function MapScreen() {
 
     // reset zoom doux
     setMapZoom(16);
-  }, [nav]);
+
+    // revenir à l'accueil après arrêt
+    navigate("/");
+  }, [nav, navigate]);
 
   function clearDestination() {
     stopNavigation();
@@ -390,6 +447,7 @@ export default function MapScreen() {
 
         setDistanceToRoute(distance);
         setRemainingDistance(rem);
+        remainingDistanceRef.current = rem;
         setRemainingDuration(etaSec);
 
         nav.update({
@@ -485,6 +543,10 @@ export default function MapScreen() {
         if (navStartAtRef.current != null) {
           const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
           setNavActualDurationSec(elapsedSec);
+          if (selected) {
+            useStatsStore.getState().addRide(selected.summary.distanceMeters, elapsedSec);
+          }
+          navStartAtRef.current = null; // évite double-comptage dans stopNavigation
         }
         setHasArrived(true);
 
@@ -607,6 +669,11 @@ export default function MapScreen() {
             selectedRoute={selected?.geometry ?? null}
             alternativeRoutes={altRoutes}
             zoom={mapZoom}
+
+            hazards={hazards}
+            parkings={parkings}
+            hazardsVisible={showHazards}
+            parkingsVisible={showParkings}
           />
         ) : (
           <div className="h-full w-full flex items-center justify-center">
@@ -616,7 +683,7 @@ export default function MapScreen() {
       </div>
 
       {/* TOP OVERLAY */}
-      <div className="absolute left-0 right-0 top-0 z-10 p-3 pt-4 space-y-2">
+<div className="absolute left-0 right-0 top-0 z-40 p-3 pt-4 space-y-2">
         <div className="mx-auto max-w-xl space-y-2">
           {/* Toast de reprise de navigation */}
           {resumeBannerLabel && (
@@ -636,6 +703,17 @@ export default function MapScreen() {
                 OK
               </button>
             </div>
+          )}
+
+          {/* Home button when navigating (pause) */}
+          {isNavigating && (
+            <button
+              onClick={() => navigate("/")}
+              className="absolute top-3 right-3 z-20 rounded-full bg-black/50 p-2 text-white"
+              title="Accueil (pause)"
+            >
+              🏠
+            </button>
           )}
 
           {/* Toast reroute automatique */}
@@ -741,7 +819,7 @@ export default function MapScreen() {
               </div>
 
               {showResults && (
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 backdrop-blur shadow-lg overflow-hidden">
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 backdrop-blur shadow-lg overflow-hidden max-h-64 overflow-y-auto touch-pan-y">
                   {results.slice(0, 6).map((r) => (
                     <div key={r.id} className="px-3 py-2 border-b border-zinc-900 last:border-b-0">
                       <div className="text-sm text-zinc-100">{r.label}</div>
@@ -825,100 +903,36 @@ export default function MapScreen() {
               </div>
             </div>
 
-            {/* Polished toggles */}
-            <div className="grid grid-cols-2 gap-2">
-              {/* Auto-route */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={autoRouting}
-                disabled={isNavigating}
-                onClick={() => setAutoRouting((v) => !v)}
-                className={[
-                  "h-[68px] w-full relative flex items-center justify-between gap-3 rounded-2xl border px-4 transition select-none",
-                  isNavigating
-                    ? "cursor-not-allowed opacity-50 border-zinc-800 bg-zinc-950/40"
-                    : autoRouting
-                      ? "border-sky-500/40 bg-sky-500/10 hover:bg-sky-500/15"
-                      : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900/60",
-                ].join(" ")}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className={autoRouting ? "text-sky-200" : "text-zinc-300"}>🧭</span>
-                  <div className="min-w-0 leading-none">
-                    <div
-                      className={autoRouting ? "text-sky-100" : "text-zinc-100"}
-                      style={{ fontSize: 12, fontWeight: 700 }}
-                    >
-                      Auto-route
-                    </div>
-                    <div className="mt-1 text-[11px] text-zinc-400 truncate">Calcule à la sélection</div>
-                  </div>
-                </div>
-
-                <div className="shrink-0">
-                  <div
-                    className={[
-                      "relative h-7 w-12 rounded-full border transition",
-                      autoRouting ? "border-sky-400/50 bg-sky-400/25" : "border-zinc-700 bg-zinc-900/60",
-                    ].join(" ")}
-                  >
-                    <span
-                      className={[
-                        "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full shadow-sm transition-all",
-                        autoRouting ? "left-[22px] bg-sky-200" : "left-[2px] bg-zinc-200",
-                      ].join(" ")}
-                    />
-                  </div>
-                </div>
-              </button>
-
-              {/* Suivre */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={navFollowUser}
-                disabled={!isNavigating}
-                onClick={() => nav.setFollowUser(!navFollowUser)}
-                className={[
-                  "h-[68px] w-full relative flex items-center justify-between gap-3 rounded-2xl border px-4 transition select-none",
-                  !isNavigating
-                    ? "cursor-not-allowed opacity-50 border-zinc-800 bg-zinc-950/40"
-                    : navFollowUser
-                      ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/15"
-                      : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900/60",
-                ].join(" ")}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className={navFollowUser ? "text-emerald-200" : "text-zinc-300"}>🎯</span>
-                  <div className="min-w-0 leading-none">
-                    <div
-                      className={navFollowUser ? "text-emerald-100" : "text-zinc-100"}
-                      style={{ fontSize: 12, fontWeight: 700 }}
-                    >
-                      Suivre
-                    </div>
-                    <div className="mt-1 text-[11px] text-zinc-400 truncate">Caméra sur toi</div>
-                  </div>
-                </div>
-
-                <div className="shrink-0">
-                  <div
-                    className={[
-                      "relative h-7 w-12 rounded-full border transition",
-                      navFollowUser ? "border-emerald-400/50 bg-emerald-400/25" : "border-zinc-700 bg-zinc-900/60",
-                    ].join(" ")}
-                  >
-                    <span
-                      className={[
-                        "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full shadow-sm transition-all",
-                        navFollowUser ? "left-[22px] bg-emerald-200" : "left-[2px] bg-zinc-200",
-                      ].join(" ")}
-                    />
-                  </div>
-                </div>
-              </button>
-            </div>
+{/* Floating controls to mimic previous minimal UI */}
+              <div className="absolute bottom-28 right-4 flex flex-col gap-2 z-20">
+                <button
+                  type="button"
+                  onClick={() => nav.setFollowUser(!navFollowUser)}
+                  disabled={!isNavigating}
+                  title="Caméra suivante"
+                  className={[
+                    "h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition",
+                    !isNavigating
+                      ? "opacity-50 cursor-not-allowed bg-zinc-900"
+                      : navFollowUser
+                        ? "bg-emerald-500"
+                        : "bg-zinc-800",
+                  ].join(" ")}
+                >
+                  🎯
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAvoidHighways((v) => !v)}
+                  title="Éviter autoroutes"
+                  className={[
+                    "h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition",
+                    avoidHighways ? "bg-amber-500" : "bg-zinc-800",
+                  ].join(" ")}
+                >
+                  ⛔
+                </button>
+              </div>
 
             {/* ACTIONS */}
             <div className="flex gap-2">

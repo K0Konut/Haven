@@ -102,7 +102,7 @@ export async function getSecureRoute(
   const coordinates = toCoordString(points);
 
   const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/cycling/${coordinates}`);
-  url.search = new URLSearchParams({
+  const params: Record<string,string> = {
     access_token: token,
     geometries: "geojson",
     overview: "full",
@@ -110,7 +110,14 @@ export async function getSecureRoute(
     alternatives: "true",
     annotations: "distance,duration,speed",
     language: "fr",
-  }).toString();
+  };
+
+  if (req.preference?.avoidHighways) {
+    // request Mapbox to exclude motorways
+    params.exclude = "motorway";
+  }
+
+  url.search = new URLSearchParams(params).toString();
 
   const data = await fetchJson<MapboxDirectionsResponse>(url.toString(), {
     signal: opts?.signal,

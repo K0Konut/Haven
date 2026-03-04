@@ -1,4 +1,3 @@
-import { requireMapboxToken } from "../../app/config/env";
 import { fetchJson } from "./http";
 import type { LatLng } from "../../types/routing";
 
@@ -8,16 +7,7 @@ export type PlaceResult = {
   center: LatLng;
 };
 
-type MapboxGeocodingResponse = {
-  features: Array<{
-    id: string;
-    place_name: string;
-    center: [number, number]; // [lng, lat]
-  }>;
-};
-
-export async function geocodeForward(query: string, proximity?: LatLng): Promise<PlaceResult[]> {
-  const token = requireMapboxToken();
+export async function geocodeForward(query: string): Promise<PlaceResult[]> {
   const q = query.trim();
   if (!q) return [];
 
@@ -39,12 +29,19 @@ export async function geocodeForward(query: string, proximity?: LatLng): Promise
     params.proximity = "2.3488,48.8534"; // Paris par defaut
   }
   url.search = new URLSearchParams(params).toString();
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.search = new URLSearchParams({
+    q: q,
+    format: "json",
+    limit: "6",
+    countrycodes: "fr"
+  }).toString();
 
-  const data = await fetchJson<MapboxGeocodingResponse>(url.toString());
+  const data = await fetchJson<any[]>(url.toString());
 
-  return (data.features ?? []).map((f) => ({
-    id: f.id,
-    label: f.place_name,
-    center: { lng: f.center[0], lat: f.center[1] },
+  return data.map((f) => ({
+    id: f.place_id.toString(),
+    label: f.display_name,
+    center: { lng: parseFloat(f.lon), lat: parseFloat(f.lat) },
   }));
 }

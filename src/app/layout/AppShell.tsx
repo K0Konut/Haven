@@ -6,6 +6,7 @@ import {
   watchPosition,
 } from "../../services/permissions/location";
 import { useLocationStore } from "../../store/location.slice";
+import FallDetectionBackground from "../../features/fall/FallDetectionBackground";
 
 const linkBase =
   "flex flex-col items-center justify-center gap-1 px-3 py-2 text-xs";
@@ -75,6 +76,8 @@ export default function AppShell() {
       >
         <Outlet />
       </main>
+
+      <FallDetectionBackground />
 
       {/* NAV */}
       <nav

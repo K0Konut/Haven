@@ -6,6 +6,7 @@ export type EmergencyContact = {
   email: string; // ex: exemple@email.com
   message: string; // texte de base
   phone?: string;
+  phone: string;
 };
 
 // legacy single contact key

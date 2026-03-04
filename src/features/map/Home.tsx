@@ -155,6 +155,19 @@ export default function Home() {
       setLoading(false);
     }
   }
+import { loadNavSession } from "../../services/navigation/persistence";
+
+export default function Home() {
+  const navigate = useNavigate();
+  const [sessionDest, setSessionDest] = useState<string | null>(null);
+
+  useEffect(() => {
+    const s = loadNavSession();
+    if (s) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSessionDest(s.destination.label);
+    }
+  }, []); // setSessionDest is stable, safe to omit from deps
 
   return (
     <section className="space-y-4">
@@ -162,6 +175,19 @@ export default function Home() {
         <h2 className="text-2xl font-bold">{greeting.emoji} {greeting.text} !</h2>
         <p className="text-sm text-zinc-400">{getSubtitle()}</p>
       </header>
+
+        <h2 className="text-2xl font-bold">Bonjour !</h2>
+        <p className="text-sm text-zinc-400">Pret pour une balade ?</p>
+      </header>
+
+      {sessionDest && (
+        <button
+          onClick={() => navigate("/map")}
+          className="w-full rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/15"
+        >
+          🔁 Reprendre vers "{sessionDest}"
+        </button>
+      )}
 
       <button
         onClick={() => navigate("/map")}
@@ -366,6 +392,16 @@ export default function Home() {
           <div className="rounded-xl p-3 text-center" style={{ background: 'rgba(109, 40, 217, 0.2)', border: '1px solid rgba(168, 85, 247, 0.25)' }}>
             <div className="text-lg font-bold text-white">{totalRides}</div>
             <div className="text-xs text-purple-300">balades</div>
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-3">
+        <div className="text-sm font-semibold text-zinc-100">📊 Vos statistiques</div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-xl border border-zinc-800 bg-black/30 p-3 text-center">
+            <div className="text-lg font-bold text-zinc-100">12.5</div>
+            <div className="text-xs text-zinc-400">km</div>
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-black/30 p-3 text-center">
+            <div className="text-lg font-bold text-zinc-100">45</div>
+            <div className="text-xs text-zinc-400">min</div>
           </div>
         </div>
       </div>
@@ -376,6 +412,9 @@ export default function Home() {
           {lastRideLabel ?? "Aucune balade enregistrée pour l'instant."}
         </div>
       </div>
+      <footer className="mt-6 text-center text-[10px] text-zinc-500">
+        Développé par l’équipe 🚴‍♂️🚴‍♀️ — projet d’une année scolaire.
+      </footer>
     </section>
   );
 }

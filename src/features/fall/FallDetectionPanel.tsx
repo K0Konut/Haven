@@ -186,13 +186,13 @@ export default function FallDetectionPanel() {
 
       try {
         const c = await loadEmergencyContact();
-        if (!c?.phone) { // Vérifie l'email au lieu du téléphone
+        if (!c?.email) { // Vérifie l'email au lieu du téléphone
           alert("Aucun contact d’urgence configuré (Réglages).");
           return;
         }
-        // Préparation des paramètres pour EmailJS
+        // Préparation des paramètres pour EmailJS//
         const templateParams = {
-          to_email: c.phone,
+          to_email: c.email,
           message: c.message,
           location: fix ? `${fix.lat}, ${fix.lng}` : "Non disponible"
         };

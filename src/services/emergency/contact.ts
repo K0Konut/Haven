@@ -1,7 +1,7 @@
 import { Preferences } from "@capacitor/preferences";
 
 export type EmergencyContact = {
-  phone: string;   // ex: +33612345678
+  email: string;   // ex: +33612345678
   message: string; // texte de base
 };
 
@@ -12,7 +12,7 @@ export async function loadEmergencyContact(): Promise<EmergencyContact | null> {
   if (!value) return null;
   try {
     const parsed = JSON.parse(value) as EmergencyContact;
-    if (!parsed?.phone) return null;
+    if (!parsed?.email) return null;
     return parsed;
   } catch {
     return null;

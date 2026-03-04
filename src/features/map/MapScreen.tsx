@@ -25,6 +25,7 @@ import {
 import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { loadNavSession, saveNavSession } from "../../services/navigation/persistence";
+import { useStatsStore } from "../../store/stats.slice";
 
 type SelectedDestination = { label: string; center: LatLng };
 
@@ -110,6 +111,9 @@ export default function MapScreen() {
 
   // restore guard
   const hasRestoredSessionRef = useRef(false);
+
+  // track remaining distance for stats on manual stop
+  const remainingDistanceRef = useRef<number | null>(null);
 
   // UX: toast "navigation reprise"
   const [resumeBannerLabel, setResumeBannerLabel] = useState<string | null>(null);
@@ -287,6 +291,16 @@ export default function MapScreen() {
     setRemainingDistance(null);
     setRemainingDuration(null);
 
+    // save stats on manual stop
+    if (navStartAtRef.current != null) {
+      const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
+      const sel = useRoutingStore.getState().selected();
+      if (sel) {
+        const traveled = Math.max(0, sel.summary.distanceMeters - (remainingDistanceRef.current ?? sel.summary.distanceMeters));
+        useStatsStore.getState().addRide(traveled, elapsedSec);
+      }
+    }
+
     navStartAtRef.current = null;
     setHasArrived(false);
     setNavActualDurationSec(null);
@@ -433,6 +447,7 @@ export default function MapScreen() {
 
         setDistanceToRoute(distance);
         setRemainingDistance(rem);
+        remainingDistanceRef.current = rem;
         setRemainingDuration(etaSec);
 
         nav.update({
@@ -528,6 +543,10 @@ export default function MapScreen() {
         if (navStartAtRef.current != null) {
           const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
           setNavActualDurationSec(elapsedSec);
+          if (selected) {
+            useStatsStore.getState().addRide(selected.summary.distanceMeters, elapsedSec);
+          }
+          navStartAtRef.current = null; // évite double-comptage dans stopNavigation
         }
         setHasArrived(true);
 
@@ -664,7 +683,7 @@ export default function MapScreen() {
       </div>
 
       {/* TOP OVERLAY */}
-      <div className="absolute left-0 right-0 top-0 z-10 p-3 pt-4 space-y-2">
+<div className="absolute left-0 right-0 top-0 z-40 p-3 pt-4 space-y-2">
         <div className="mx-auto max-w-xl space-y-2">
           {/* Toast de reprise de navigation */}
           {resumeBannerLabel && (

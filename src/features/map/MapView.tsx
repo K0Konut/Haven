@@ -271,6 +271,14 @@ export default function MapView({
     } else {
       destMarkerRef.current.setLngLat(lngLat);
     }
+    // center the map on destination when it changes (programmatic move)
+    try {
+      programmaticMoveRef.current = true;
+      map.easeTo({ center: lngLat, duration: 450, essential: true });
+      map.once("moveend", () => (programmaticMoveRef.current = false));
+    } catch {
+      programmaticMoveRef.current = false;
+    }
   }, [destination]);
 
 

@@ -7,10 +7,9 @@ export async function sendEmergencyEmail(params: {
   contact: EmergencyContact;
   currentLocation?: LatLng | null;
 }): Promise<void> {
-  // TODO: implement email sending
-const { contact, currentLocation } = params;
+  const { contact, currentLocation } = params;
 
- let locationText = "";
+  let locationText = "";
   if (currentLocation) {
     const mapsLink = `https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`;
     locationText = `\n\nPosition GPS: ${currentLocation.lat}, ${currentLocation.lng}\nVoir sur Google Maps: ${mapsLink}`;
@@ -23,11 +22,18 @@ const { contact, currentLocation } = params;
     message: fullMessage,
   };
 
-  await emailjs.send(
-    emailjsConfig.serviceId,
-    emailjsConfig.templateId,
-    templateParams,
-    emailjsConfig.publicKey
-  );
+  // Validate config and provide clear error when not configured
+  const { serviceId, templateId, publicKey } = emailjsConfig;
+  if (!serviceId || !templateId || !publicKey || serviceId.includes("your_") || templateId.includes("your_") || publicKey.includes("your_")) {
+    throw new Error(
+      "EmailJS non configuré: définissez VITE_EMAILJS_SERVICE_ID, VITE_EMAILJS_TEMPLATE_ID et VITE_EMAILJS_PUBLIC_KEY dans .env"
+    );
+  }
 
+  try {
+    await emailjs.send(serviceId, templateId, templateParams, publicKey);
+  } catch (err) {
+    const e = err instanceof Error ? err : new Error(String(err));
+    throw new Error(`Échec envoi EmailJS: ${e.message}`);
+  }
 }

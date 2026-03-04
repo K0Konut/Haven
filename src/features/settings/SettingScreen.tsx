@@ -18,11 +18,6 @@ export default function SettingsScreen() {
 
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [editing, setEditing] = useState<EmergencyContact | null>(null);
-  const [contact, setContact] = useState<EmergencyContact>({
-    email: "",
-    message: DEFAULT_MSG,
-    phone: "",
-  });
   const [status, setStatus] = useState<string | null>(null);
 
   function isValidEmail(e?: string) {
@@ -80,20 +75,9 @@ export default function SettingsScreen() {
     if (!id) return;
     const next = contacts.filter((c) => c.id !== id);
     await persistContacts(next);
-    await saveEmergencyContact({
-      email: contact.email.trim(),
-      message: contact.message?.trim() || DEFAULT_MSG,
-      phone: contact.phone.trim(),
-    });
-    setStatus("✅ Contact enregistré.");
-  }
-
-  async function handleClear() {
-    await clearEmergencyContact();
-    setContact({ email: "", message: DEFAULT_MSG, phone: "" });
-    setStatus("✅ Contact supprimé.");
     if (next.length > 0) setEditing(next[0]);
     else setEditing({ email: "", message: DEFAULT_MSG });
+    setStatus("✅ Contact supprimé.");
   }
 
   async function handleClearAll() {
@@ -115,15 +99,6 @@ export default function SettingsScreen() {
 
     try {
       await sendEmergencyEmail({ contact: { ...toTest, message: msg }, currentLocation: fix ?? null });
-    const msg =
-      (contact.message?.trim() || DEFAULT_MSG) +
-      "\n\n✅ Test Haven : ceci est un message de test (pas une vraie alerte).";
-
-    try {
-      await sendEmergencyEmail({
-        contact: { email, message: msg, phone: contact.phone.trim() },
-        currentLocation: fix ?? null,
-      });
       setStatus("✅ Email envoyé avec succès !");
     } catch (error) {
       console.error("Erreur envoi email:", error);

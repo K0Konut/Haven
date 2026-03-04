@@ -190,7 +190,7 @@ export default function FallDetectionPanel() {
           alert("Aucun contact d’urgence configuré (Réglages).");
           return;
         }
-        // Préparation des paramètres pour EmailJS
+        // Préparation des paramètres pour EmailJS//
         const templateParams = {
           to_email: c.email,
           message: c.message,

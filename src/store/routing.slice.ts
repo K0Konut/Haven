@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { RouteCandidate, RouteRequest } from "../types/routing";
 import { getSecureRoute } from "../services/mapbox/directions";
 
@@ -20,7 +21,9 @@ type RoutingState = {
   clear: () => void;
 };
 
-export const useRoutingStore = create<RoutingState>((set, get) => ({
+export const useRoutingStore = create<RoutingState>()(
+  persist(
+    (set, get) => ({
   loading: false,
   error: null,
 
@@ -73,4 +76,15 @@ export const useRoutingStore = create<RoutingState>((set, get) => ({
 
   select: (id) => set({ selectedId: id }),
   clear: () => set({ candidates: [], selectedId: null, error: null }),
-}));
+    }),
+    {
+      name: "routing-store",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        request: state.request,
+        candidates: state.candidates,
+        selectedId: state.selectedId,
+      }),
+    }
+  )
+);

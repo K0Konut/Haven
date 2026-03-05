@@ -1,93 +1,9 @@
-import { useEffect, useState } from "react";
-import { requestMotionPermission } from "../../services/permissions/motion";
-import { useFallStore } from "../../store/fall.slice";
-import { loadEmergencyContact } from "../../services/emergency/contact";
-
-export default function FallDetectionPanel() {
-  const enabled = useFallStore((s) => s.enabled);
-  const setEnabled = useFallStore((s) => s.setEnabled);
-  const status = useFallStore((s) => s.status);
-  const conf = useFallStore((s) => s.lastConfidence);
-
-  const [contactOk, setContactOk] = useState<boolean>(false);
-
-  useEffect(() => {
-    (async () => {
-      const c = await loadEmergencyContact();
-      setContactOk(!!c?.email);
-    })();
-  }, []);
-
-  async function toggle() {
-    if (!enabled) {
-      const perm = await requestMotionPermission();
-      if (perm === "denied") {
-        alert("Permission capteurs refusée. Active-la dans les réglages.");
-        return;
-      }
-      const c = await loadEmergencyContact();
-      setContactOk(!!c?.email);
-      if (!c?.email) {
-        alert("Configure un contact d’urgence dans Réglages avant d’activer.");
-        return;
-      }
-    }
-    setEnabled(!enabled);
-  }
-
-  return (
-    <>
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold text-zinc-100">Détection de chute</div>
-            <div className="text-xs text-zinc-400">
-              Impact + immobilité • envoie un email au contact d’urgence
-            </div>
-            {!contactOk && (
-              <div className="mt-1 text-xs text-amber-300">
-                ⚠️ Aucun contact d’urgence configuré.
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={toggle}
-            className={`rounded-xl border px-3 py-2 text-xs ${enabled
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
-                : "border-zinc-800 bg-zinc-900 text-zinc-200"
-              }`}
-          >
-            {enabled ? "Activé" : "Activer"}
-          </button>
-        </div>
-
-        <div className="text-xs text-zinc-400">
-          Statut: <span className="text-zinc-200">{status}</span>
-          {enabled && (
-            <>
-              {" • "}mode: <span className="text-zinc-200">actif en fond (trajet inclus)</span>
-            </>
-          )}
-          {conf != null && (
-            <>
-              {" • "}confiance:{" "}
-              <span className="text-zinc-200">{Math.round(conf * 100)}%</span>
-            </>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
-*/
 import { useEffect, useRef, useState } from "react";
 import { requestMotionPermission } from "../../services/permissions/motion";
 import { useFallStore } from "../../store/fall.slice";
 import { useFallDetection } from "./useFallDetection";
 import { loadEmergencyContact } from "../../services/emergency/contact";
-import emailjs from '@emailjs/browser'; // nouvel ajout
-//import { openEmergencySms } from "../../services/emergency/sms"; à supprimer normalement
+import emailjs from "@emailjs/browser";
 import { useLocationStore } from "../../store/location.slice";
 
 export default function FallDetectionPanel() {
@@ -109,7 +25,7 @@ export default function FallDetectionPanel() {
   useEffect(() => {
     (async () => {
       const c = await loadEmergencyContact();
-      setContactOk(!!c?.email); //modif ici
+      setContactOk(!!c?.email);
     })();
   }, []);
 
@@ -126,28 +42,27 @@ export default function FallDetectionPanel() {
 
       try {
         const c = await loadEmergencyContact();
-        if (!c?.email) { // Vérifie l'email au lieu du téléphone
-          alert("Aucun contact d’urgence configuré (Réglages).");
+        if (!c?.email) {
+          alert("Aucun contact d'urgence configuré (Réglages).");
           return;
         }
-        // Préparation des paramètres pour EmailJS//
+        // Préparation des paramètres pour EmailJS
         const templateParams = {
           to_email: c.email,
           message: c.message,
-          location: fix ? `${fix.lat}, ${fix.lng}` : "Non disponible"
+          location: fix ? `${fix.lat}, ${fix.lng}` : "Non disponible",
         };
 
         await emailjs.send(
-          'YOUR_SERVICE_ID', 
-          'YOUR_TEMPLATE_ID', 
-          templateParams, 
-          'YOUR_PUBLIC_KEY'
+          "YOUR_SERVICE_ID",
+          "YOUR_TEMPLATE_ID",
+          templateParams,
+          "YOUR_PUBLIC_KEY"
         );
         console.log("Alerte email envoyée avec succès");
       } catch (error) {
         console.error("Erreur lors de l'envoi de l'alerte:", error);
-      }
-      finally {
+      } finally {
         // allow again for future detections
         setTimeout(() => (sendingRef.current = false), 1500);
       }
@@ -162,9 +77,9 @@ export default function FallDetectionPanel() {
         return;
       }
       const c = await loadEmergencyContact();
-      setContactOk(!!c?.email); //modif ici
+      setContactOk(!!c?.email);
       if (!c?.email) {
-        alert("Configure un contact d’urgence dans Réglages avant d’activer.");
+        alert("Configure un contact d'urgence dans Réglages avant d'activer.");
         return;
       }
     }
@@ -176,23 +91,26 @@ export default function FallDetectionPanel() {
       <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-semibold text-zinc-100">Détection de chute</div>
+            <div className="text-sm font-semibold text-zinc-100">
+              Détection de chute
+            </div>
             <div className="text-xs text-zinc-400">
-              Impact + immobilité • envoie un email au contact d’urgence
+              Impact + immobilité • envoie un email au contact d'urgence
             </div>
             {!contactOk && (
               <div className="mt-1 text-xs text-amber-300">
-                ⚠️ Aucun contact d’urgence configuré.
+                ⚠️ Aucun contact d'urgence configuré.
               </div>
             )}
           </div>
 
           <button
             onClick={toggle}
-            className={`rounded-xl border px-3 py-2 text-xs ${enabled
+            className={`rounded-xl border px-3 py-2 text-xs ${
+              enabled
                 ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
                 : "border-zinc-800 bg-zinc-900 text-zinc-200"
-              }`}
+            }`}
           >
             {enabled ? "Activé" : "Activer"}
           </button>
@@ -217,7 +135,9 @@ export default function FallDetectionPanel() {
               Envoi de l'email dans{" "}
               <span className="font-bold text-sky-300">{countdownSec}s</span>
             </div>
-            <div className="text-xs text-zinc-400">Si tout va bien, annule maintenant.</div>
+            <div className="text-xs text-zinc-400">
+              Si tout va bien, annule maintenant.
+            </div>
 
             <div className="flex gap-2 pt-2">
               <button

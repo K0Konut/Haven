@@ -90,10 +90,6 @@ export default function MapScreen() {
   const routeAbortRef = useRef<AbortController | null>(null);
   const stopWatchRef = useRef<null | (() => void)>(null);
 
-
-  // auto-start nav après calcul si autoRouting est actif
-  const pendingAutoStartRef = useRef(false);
-
   // reroute logic
   const offRouteStreakRef = useRef(0);
   const lastRerouteAtRef = useRef(0);
@@ -196,7 +192,6 @@ export default function MapScreen() {
     return () => {
       stopWatchRef.current?.();
       routeAbortRef.current?.abort();
-      nav.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -218,7 +213,7 @@ export default function MapScreen() {
     try {
       setSearchError(null);
       setSearchLoading(true);
-      const r = await geocodeForward(query);
+      const r = await geocodeForward(query, fix ? { lat: fix.lat, lng: fix.lng } : undefined);
       setResults(r);
     } catch (e) {
       setSearchError(e instanceof Error ? e.message : "Erreur recherche");
@@ -241,8 +236,6 @@ export default function MapScreen() {
       routeAbortRef.current?.abort();
       const ac = new AbortController();
       routeAbortRef.current = ac;
-
-      routing.clear();
 
       await routing.calculate(
         {
@@ -267,8 +260,6 @@ export default function MapScreen() {
     setQ(r.label);
 
     if (autoRouting) {
-      // on veut démarrer dès que le routing a fini
-      pendingAutoStartRef.current = true;
       void calculateTo(dest);
     } else {
       routing.clear();
@@ -592,13 +583,11 @@ export default function MapScreen() {
 
     void (async () => {
       await calculateTo(dest);
-      const selectedNow = useRoutingStore.getState().selected();
-      if (selectedNow && !useNavigationStore.getState().isNavigating) {
-        startNavigation();
+      if (useRoutingStore.getState().selected()) {
         setResumeBannerLabel(dest.label);
       }
     })();
-  }, [fix, calculateTo, startNavigation]);
+  }, [fix, calculateTo]);
 
   // Auto-hide du toast "navigation reprise"
   useEffect(() => {
@@ -623,22 +612,6 @@ export default function MapScreen() {
       return prev + (target - prev) * SMOOTH;
     });
   }, [isNavigating]);
-
-    // Auto-start navigation quand autoRouting est actif
-  useEffect(() => {
-    if (!pendingAutoStartRef.current) return;
-    if (routing.loading) return;
-    if (!destination || !selected || !fix) return;
-    if (isNavigating) {
-      // déjà en nav (ou user a démarré à la main)
-      pendingAutoStartRef.current = false;
-      return;
-    }
-
-    pendingAutoStartRef.current = false;
-    startNavigation();
-  }, [routing.loading, destination, selected, fix, isNavigating, startNavigation]);
-
 
   const showResults = results.length > 0 && !isNavigating;
 

@@ -119,9 +119,7 @@ export const useNavigationStore = create<NavState>()(
       name: "navigation-store",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        isNavigating: state.isNavigating,
         followUser: state.followUser,
-        offRoute: state.offRoute,
       }),
     }
   )

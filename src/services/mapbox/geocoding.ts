@@ -10,6 +10,17 @@ export type PlaceResult = {
   center: LatLng;
 };
 
+type MapboxFeature = {
+  id: string;
+  place_name: string;
+  context?: Array<{ text?: string }>;
+  center: [number, number];
+};
+
+type MapboxGeocodingResponse = {
+  features?: MapboxFeature[];
+};
+
 export async function geocodeForward(query: string, proximity?: LatLng): Promise<PlaceResult[]> {
   const q = query.trim();
   if (!q) return [];
@@ -31,9 +42,9 @@ export async function geocodeForward(query: string, proximity?: LatLng): Promise
 
   url.search = new URLSearchParams(params).toString();
 
-  const data = await fetchJson<any>(url.toString());
+  const data = await fetchJson<MapboxGeocodingResponse>(url.toString());
 
-  return (data.features ?? []).map((f: any) => ({
+  return (data.features ?? []).map((f) => ({
     id: f.id,
     label: f.place_name,
     context: f.context?.[0]?.text ?? undefined,

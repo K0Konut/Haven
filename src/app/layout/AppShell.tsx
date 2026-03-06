@@ -38,17 +38,17 @@ export default function AppShell() {
         try {
           const pos = await getCurrentPosition();
           setFix(pos);
-        } catch (e) {
+        } catch {
           // ignore initial getCurrentPosition failures
         }
 
         stopWatch = watchPosition((newFix) => {
           setFix(newFix);
-        }, (_err) => {
+        }, () => {
           // ignore watch errors for now
           // console.error('watchPosition error', err);
         });
-      } catch (e) {
+      } catch {
         // no-op
       }
     })();

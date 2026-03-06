@@ -4,7 +4,7 @@ import {
   loadEmergencyContacts,
   type EmergencyContact,
 } from "../../services/emergency/contact";
-import { geocodeForward } from "../../services/mapbox/geocoding";
+import { geocodeForward, type PlaceResult } from "../../services/mapbox/geocoding";
 import MapView from "./MapView";
 import {
   loadFavorites,
@@ -59,9 +59,9 @@ export default function Home() {
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [showAddressPanel, setShowAddressPanel] = useState(false);
   const [addressQuery, setAddressQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<PlaceResult[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<PlaceResult | null>(null);
   const [favName, setFavName] = useState("");
   const [favStatus, setFavStatus] = useState<string | null>(null);
   const [emergencyStatus, setEmergencyStatus] = useState<string | null>(null);

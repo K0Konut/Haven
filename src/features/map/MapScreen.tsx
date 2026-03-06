@@ -193,7 +193,6 @@ export default function MapScreen() {
       stopWatchRef.current?.();
       routeAbortRef.current?.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Ghost routes

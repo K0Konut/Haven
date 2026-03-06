@@ -9,12 +9,15 @@ import {
 } from "../../services/emergency/contact";
 import emailjs from "@emailjs/browser";
 import { useLocationStore } from "../../store/location.slice";
+import { useFallStore } from "../../store/fall.slice";
 
 const DEFAULT_MSG =
   "🚨 Haven : chute potentielle détectée. Si je ne réponds pas, peux-tu me contacter ?";
 
 export default function SettingsScreen() {
   const fix = useLocationStore((s) => s.fix);
+  const fallConfig = useFallStore((s) => s.config);
+  const setFallConfig = useFallStore((s) => s.setConfig);
 
   const [contact, setContact] = useState<EmergencyContact>({
     email: "",
@@ -81,6 +84,22 @@ export default function SettingsScreen() {
     }
   }
 
+  function applySensitivity(raw: number) {
+    const sensitivity = Math.max(0, Math.min(100, raw));
+    const t = sensitivity / 100;
+
+    const impactG = Number((1.55 - 0.6 * t).toFixed(2));
+    const impactGyroDps = Math.round(150 - 85 * t);
+    const freefallG = Number((0.5 + 0.22 * t).toFixed(2));
+
+    setFallConfig({
+      sensitivity,
+      impactG,
+      impactGyroDps,
+      freefallG,
+    });
+  }
+
   return (
     <div className="space-y-4">
       <header className="space-y-1">
@@ -92,6 +111,33 @@ export default function SettingsScreen() {
 
       <FallDetectionPanel />
       <FallDebugPanel />
+
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-3">
+        <div className="text-sm font-semibold text-zinc-100">
+          Sensibilité détection de chute
+        </div>
+        <div className="text-xs text-zinc-400">
+          Ajuste la sensibilité des capteurs (accélération, gravité, gyroscope).
+        </div>
+
+        <div className="space-y-2">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={fallConfig.sensitivity ?? 60}
+            onChange={(e) => applySensitivity(Number(e.target.value))}
+            className="w-full accent-sky-400"
+          />
+
+          <div className="flex items-center justify-between text-xs text-zinc-400">
+            <span>Moins sensible</span>
+            <span className="text-zinc-200 font-semibold">{fallConfig.sensitivity ?? 60}%</span>
+            <span>Plus sensible</span>
+          </div>
+        </div>
+      </div>
 
       <div className="rounded-2xl border border-zinc-800 bg-zinc-950/60 p-4 space-y-3">
         <div className="text-sm font-semibold text-zinc-100">

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 type NavState = {
   isNavigating: boolean;
@@ -43,7 +44,9 @@ type NavState = {
   ) => void;
 };
 
-export const useNavigationStore = create<NavState>((set) => ({
+export const useNavigationStore = create<NavState>()(
+  persist(
+    (set) => ({
   isNavigating: false,
   followUser: true,
   offRoute: false,
@@ -111,4 +114,13 @@ export const useNavigationStore = create<NavState>((set) => ({
   setRouteProgress: (segIndex, t) => set({ routeSegIndex: segIndex, routeT: t }),
 
   update: (p) => set((s) => ({ ...s, ...p })),
-}));
+    }),
+    {
+      name: "navigation-store",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        followUser: state.followUser,
+      }),
+    }
+  )
+);

@@ -3,6 +3,7 @@ import { create } from "zustand";
 type FallStatus = "idle" | "listening" | "possible" | "countdown";
 
 export type FallConfig = {
+  sensitivity: number; // 0..100
   countdownSeconds: number;
   warmupMs: number;
   cooldownMs: number;
@@ -82,6 +83,7 @@ export const useFallStore = create<FallState>((set) => {
     lastAlertAt: null,
 
     config: {
+      sensitivity: 60,
       countdownSeconds: 15,
       warmupMs: 2500,
       cooldownMs: 20000,

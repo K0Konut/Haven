@@ -8,6 +8,9 @@ import { requireMapboxToken } from "../../app/config/env";
 type Props = {
   center: LatLng;
   zoom?: number;
+  
+  // Ajout pour le géocodage inversé (clic sur la carte)
+  onMapClick?: (coords: LatLng) => void;
 
   // nav camera
   heading?: number | null; // degrés
@@ -62,6 +65,7 @@ function shortestBearing(from: number, to: number) {
 export default function MapView({
   center,
   zoom = 15,
+  onMapClick, // Extraction de la prop ici
   heading = null,
   followUser = false,
   onUserGesture,
@@ -106,6 +110,12 @@ export default function MapView({
       center: [center.lng, center.lat],
       zoom,
     });
+
+    // --- Événement de clic pour le géocodage inversé ---
+    map.on('click', (e) => {
+      onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+    });
+    // ----------------------------------------------------
 
     map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
 

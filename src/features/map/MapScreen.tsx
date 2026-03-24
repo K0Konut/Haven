@@ -290,6 +290,36 @@ export default function MapScreen() {
     }
   }
 
+  async function handleMapClick(coords: LatLng) {
+    if (isNavigating) return; 
+
+    try {
+      setSearchLoading(true);
+      const res = await fetch(`https://photon.komoot.io/reverse?lon=${coords.lng}&lat=${coords.lat}&lang=fr`);
+      const data = await res.json();
+
+      let label = "Point sur la carte";
+      let id = Math.random().toString();
+
+      if (data.features && data.features.length > 0) {
+        const f = data.features[0];
+        id = f.properties.osm_id?.toString() || id;
+        label = [
+          f.properties.name,
+          f.properties.housenumber,
+          f.properties.street,
+          f.properties.city
+        ].filter(Boolean).join(", ") || label;
+      }
+
+      setAsDestination({ id, label, center: coords });
+    } catch (e) {
+      setAsDestination({ id: Math.random().toString(), label: "Point sur la carte", center: coords });
+    } finally {
+      setSearchLoading(false);
+    }
+  }
+
 
   const stopNavigation = useCallback(() => {
     stopWatchRef.current?.();
@@ -657,8 +687,9 @@ export default function MapScreen() {
       {/* MAP */}
       <div className="absolute inset-0">
         {fix ? (
-          <MapView
+        <MapView
             center={fix}
+            onMapClick={handleMapClick}
             heading={fix.heading ?? null}
             followUser={isNavigating && navFollowUser}
             onUserGesture={handleUserGesture}
@@ -666,12 +697,14 @@ export default function MapScreen() {
             selectedRoute={selected?.geometry ?? null}
             alternativeRoutes={altRoutes}
             zoom={mapZoom}
-
             hazards={hazards}
             parkings={parkings}
             hazardsVisible={showHazards}
             parkingsVisible={showParkings}
           />
+
+          
+
         ) : (
           <div className="h-full w-full flex items-center justify-center">
             <p className="text-sm text-zinc-400">Chargement de la localisation…</p>

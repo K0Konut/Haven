@@ -210,15 +210,40 @@ export default function MapScreen() {
       return;
     }
     try {
-      setSearchError(null);
-      setSearchLoading(true);
-      const r = await geocodeForward(query, fix ? { lat: fix.lat, lng: fix.lng } : undefined);
-      setResults(r);
-    } catch (e) {
-      setSearchError(e instanceof Error ? e.message : "Erreur recherche");
-    } finally {
-      setSearchLoading(false);
+  setSearchError(null);
+  setSearchLoading(true);
+  
+// 1. On construit l'URL avec la position actuelle (fix) pour la proximité
+  let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lang=fr&limit=6`;
+  if (fix) {
+    url += `&lat=${fix.lat}&lon=${fix.lng}`;
+  }
+
+  // 2. Appel direct à l'API
+  const response = await fetch(url);
+  const data = await response.json();
+
+  // 3. On reformate pour correspondre à ton type PlaceResult
+  const formatted: PlaceResult[] = data.features.map((f: any) => ({
+    id: f.properties.osm_id?.toString() || Math.random().toString(),
+    label: [
+      f.properties.name,
+      f.properties.housenumber,
+      f.properties.street,
+      f.properties.city
+    ].filter(Boolean).join(", "),
+    center: { 
+      lng: f.geometry.coordinates[0], 
+      lat: f.geometry.coordinates[1] 
     }
+  }));
+
+  setResults(formatted);
+} catch (e) {
+  setSearchError("Erreur lors de la recherche");
+} finally {
+  setSearchLoading(false);
+}
   }
 
   // Debounced autocomplete

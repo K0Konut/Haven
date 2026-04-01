@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ensureLocationPermission,
-  getCurrentPosition,
   watchPosition,
 } from "../../services/permissions/location";
 import { useLocationStore } from "../../store/location.slice";
@@ -10,8 +10,12 @@ import { useNavigationStore } from "../../store/navigation.slice";
 import MapView from "./MapView";
 import NavBanner from "./components/NavBanner";
 import { formatDistance, formatDuration } from "../../services/routing/format";
-import { geocodeForward, type PlaceResult } from "../../services/mapbox/geocoding";
+import { type PlaceResult } from "../../services/mapbox/geocoding";
 import type { LatLng } from "../../types/routing";
+import type { Hazard, ParkingSpot } from "../../types/map";
+import { fetchHazards } from "../../services/map/hazards";
+import { fetchParkingSpots } from "../../services/map/parking";
+import { useOverlayStore } from "../../store/overlay.slice";
 import {
   distanceToRouteMeters,
   remainingRouteDistanceMeters,
@@ -20,6 +24,9 @@ import {
 import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { loadNavSession, saveNavSession } from "../../services/navigation/persistence";
+import { useStatsStore } from "../../store/stats.slice";
+import { motion, type PanInfo } from "framer-motion";
+
 
 type SelectedDestination = { label: string; center: LatLng };
 
@@ -46,6 +53,7 @@ function gpsPillClass(q: GpsQuality) {
 
 export default function MapScreen() {
   const { permission, fix, setPermission, setFix } = useLocationStore();
+  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
   const routing = useRoutingStore();
@@ -54,7 +62,7 @@ export default function MapScreen() {
   const nav = useNavigationStore();
   const isNavigating = useNavigationStore((s) => s.isNavigating);
   const navFollowUser = useNavigationStore((s) => s.followUser);
-
+  const [sheetY, setSheetY] = useState(0);
   const [destination, setDestination] = useState<SelectedDestination | null>(null);
 
   // Search UI
@@ -64,19 +72,24 @@ export default function MapScreen() {
   const [searchError, setSearchError] = useState<string | null>(null);
 
   // UX toggles
-  const [autoRouting, setAutoRouting] = useState(true);
+  const [autoRouting] = useState(true); // always auto-start when selecting destination
+  const [avoidHighways, setAvoidHighways] = useState(false);
+
+  // extras visibility (global store)
+  const showHazards = useOverlayStore((s) => s.showHazards);
+  const showParkings = useOverlayStore((s) => s.showParkings);
 
   // Live metrics
   const [distanceToRoute, setDistanceToRoute] = useState<number | null>(null);
   const [remainingDistance, setRemainingDistance] = useState<number | null>(null);
   const [remainingDuration, setRemainingDuration] = useState<number | null>(null);
 
+  // extras: real‑time hazards & parking spots
+  const [hazards, setHazards] = useState<Hazard[]>([]);
+  const [parkings, setParkings] = useState<ParkingSpot[]>([]);
+
   const routeAbortRef = useRef<AbortController | null>(null);
   const stopWatchRef = useRef<null | (() => void)>(null);
-
-
-  // auto-start nav après calcul si autoRouting est actif
-  const pendingAutoStartRef = useRef(false);
 
   // reroute logic
   const offRouteStreakRef = useRef(0);
@@ -95,6 +108,9 @@ export default function MapScreen() {
 
   // restore guard
   const hasRestoredSessionRef = useRef(false);
+
+  // track remaining distance for stats on manual stop
+  const remainingDistanceRef = useRef<number | null>(null);
 
   // UX: toast "navigation reprise"
   const [resumeBannerLabel, setResumeBannerLabel] = useState<string | null>(null);
@@ -121,6 +137,27 @@ export default function MapScreen() {
     if (s.isNavigating) s.setFollowUser(false);
   }, []);
 
+  // fetch hazards & parking every minute
+  useEffect(() => {
+    let mounted = true;
+    async function loadAll() {
+      try {
+        const [h, p] = await Promise.all([fetchHazards(), fetchParkingSpots()]);
+        if (!mounted) return;
+        setHazards(h);
+        setParkings(p);
+      } catch (e) {
+        console.warn("failed to load map extras", e);
+      }
+    }
+    loadAll();
+    const id = window.setInterval(loadAll, 60 * 1000);
+    return () => {
+      mounted = false;
+      window.clearInterval(id);
+    };
+  }, []);
+
   // ✅ request notifications permission once (Android 13+ needs it)
   useEffect(() => {
     (async () => {
@@ -135,7 +172,7 @@ export default function MapScreen() {
     })();
   }, []);
 
-  // Init permission + first fix
+  // Init permission + suivi temps réel au démarrage
   useEffect(() => {
     (async () => {
       try {
@@ -143,8 +180,15 @@ export default function MapScreen() {
         const perm = await ensureLocationPermission();
         setPermission(perm);
 
-        const pos = await getCurrentPosition();
-        setFix(pos);
+        if (perm === 'granted') {
+          // On utilise ton watchPosition local
+          const stopWatch = watchPosition((pos) => {
+            setFix(pos);
+          });
+          
+          stopWatchRef.current = stopWatch;
+        }
+
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erreur inconnue");
       }
@@ -156,9 +200,7 @@ export default function MapScreen() {
     return () => {
       stopWatchRef.current?.();
       routeAbortRef.current?.abort();
-      nav.stop();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Ghost routes
@@ -178,10 +220,32 @@ export default function MapScreen() {
     try {
       setSearchError(null);
       setSearchLoading(true);
-      const r = await geocodeForward(query, fix ?? undefined);
-      setResults(r);
+      
+      let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lang=fr&limit=6`;
+      if (fix) {
+        url += `&lat=${fix.lat}&lon=${fix.lng}`;
+      }
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const formatted: PlaceResult[] = data.features.map((f: any) => ({
+        id: f.properties.osm_id?.toString() || Math.random().toString(),
+        label: [
+          f.properties.name,
+          f.properties.housenumber,
+          f.properties.street,
+          f.properties.city
+        ].filter(Boolean).join(", "),
+        center: { 
+          lng: f.geometry.coordinates[0], 
+          lat: f.geometry.coordinates[1] 
+        }
+      }));
+
+      setResults(formatted);
     } catch (e) {
-      setSearchError(e instanceof Error ? e.message : "Erreur recherche");
+      setSearchError("Erreur lors de la recherche");
     } finally {
       setSearchLoading(false);
     }
@@ -189,10 +253,13 @@ export default function MapScreen() {
 
   // Debounced autocomplete
   useEffect(() => {
+    if (destination && q === destination.label) {
+      setResults([]);
+      return;
+    }
     const t = setTimeout(() => void runSearch(), 350);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, fix]);
+  }, [q, destination]);
 
   const calculateTo = useCallback(
     async (dest: SelectedDestination) => {
@@ -202,18 +269,20 @@ export default function MapScreen() {
       const ac = new AbortController();
       routeAbortRef.current = ac;
 
-      routing.clear();
-
       await routing.calculate(
         {
           origin: fix,
           destination: dest.center,
-          preference: { preferBikeLanes: 1, preferQuietStreets: 0.8 },
+          preference: {
+            preferBikeLanes: 1,
+            preferQuietStreets: 0.8,
+            avoidHighways: avoidHighways,
+          },
         },
         { signal: ac.signal }
       );
     },
-    [fix, routing]
+    [fix, routing, avoidHighways]
   );
 
     function setAsDestination(r: PlaceResult) {
@@ -223,11 +292,39 @@ export default function MapScreen() {
     setQ(r.label);
 
     if (autoRouting) {
-      // on veut démarrer dès que le routing a fini
-      pendingAutoStartRef.current = true;
       void calculateTo(dest);
     } else {
       routing.clear();
+    }
+  }
+
+  async function handleMapClick(coords: LatLng) {
+    if (isNavigating) return; 
+
+    try {
+      setSearchLoading(true);
+      const res = await fetch(`https://photon.komoot.io/reverse?lon=${coords.lng}&lat=${coords.lat}&lang=fr`);
+      const data = await res.json();
+
+      let label = "Point sur la carte";
+      let id = Math.random().toString();
+
+      if (data.features && data.features.length > 0) {
+        const f = data.features[0];
+        id = f.properties.osm_id?.toString() || id;
+        label = [
+          f.properties.name,
+          f.properties.housenumber,
+          f.properties.street,
+          f.properties.city
+        ].filter(Boolean).join(", ") || label;
+      }
+
+      setAsDestination({ id, label, center: coords });
+    } catch (e) {
+      setAsDestination({ id: Math.random().toString(), label: "Point sur la carte", center: coords });
+    } finally {
+      setSearchLoading(false);
     }
   }
 
@@ -247,6 +344,16 @@ export default function MapScreen() {
     setRemainingDistance(null);
     setRemainingDuration(null);
 
+    // save stats on manual stop
+    if (navStartAtRef.current != null) {
+      const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
+      const sel = useRoutingStore.getState().selected();
+      if (sel) {
+        const traveled = Math.max(0, sel.summary.distanceMeters - (remainingDistanceRef.current ?? sel.summary.distanceMeters));
+        useStatsStore.getState().addRide(traveled, elapsedSec);
+      }
+    }
+
     navStartAtRef.current = null;
     setHasArrived(false);
     setNavActualDurationSec(null);
@@ -258,7 +365,10 @@ export default function MapScreen() {
 
     // reset zoom doux
     setMapZoom(16);
-  }, [nav]);
+
+    // revenir à l'accueil après arrêt
+    //navigate("/");
+  }, [nav, navigate]);
 
   function clearDestination() {
     stopNavigation();
@@ -283,32 +393,28 @@ export default function MapScreen() {
   const startNavigation = useCallback(() => {
     if (!destination || !selected || !fix) return;
 
-    nav.start(); // followUser = true dans le store
+    nav.start();
 
-    // départ de session nav
     navStartAtRef.current = Date.now();
     setHasArrived(false);
     setNavActualDurationSec(null);
 
-    // persiste la session de nav
     saveNavSession({
       version: 1,
       savedAt: Date.now(),
       destination,
     });
 
-    // reset feedback guards
     offRouteRef.current = false;
     lastInstrRef.current = null;
-
     offRouteStreakRef.current = 0;
     lastRerouteAtRef.current = 0;
 
     stopWatchRef.current?.();
-    stopWatchRef.current = watchPosition(async (newFix) => {
+
+    const stopWatch = watchPosition((newFix) => {
       const nowTs = Date.now();
 
-      // --- Gating simple pour l'update du store location (setFix)
       const FIX_MIN_INTERVAL_MS = 220;
       const shouldUpdateFix =
         lastFixUpdateAtRef.current === 0 ||
@@ -322,7 +428,6 @@ export default function MapScreen() {
       if (!selected) return;
 
       const accGps = newFix.accuracy ?? 999;
-
       const { routeSegIndex } = useNavigationStore.getState();
 
       const snap = distanceToRouteMeters(newFix, selected.geometry, {
@@ -331,7 +436,6 @@ export default function MapScreen() {
         fallbackToFullScan: accGps > GPS_MAX_ACC_FOR_SNAP ? false : true,
       });
 
-      // store progress for next tick (seulement si GPS correct)
       if (accGps <= GPS_MAX_ACC_FOR_SNAP) {
         nav.setRouteProgress(snap.segmentIndex, snap.t);
       }
@@ -340,12 +444,10 @@ export default function MapScreen() {
       const segmentIndex = snap.segmentIndex;
       const t = snap.t;
 
-      // OFF-ROUTE hystérésis + garde-fou accuracy
       const OFF_ROUTE_ENTER = 40;
       const OFF_ROUTE_EXIT = 28;
 
       const wasOff = offRouteRef.current;
-
       let isOff = wasOff;
       if (accGps <= GPS_MAX_ACC_FOR_OFFROUTE) {
         isOff = wasOff ? distance > OFF_ROUTE_EXIT : distance > OFF_ROUTE_ENTER;
@@ -354,7 +456,6 @@ export default function MapScreen() {
       nav.setOffRoute(isOff);
 
       const rem = remainingRouteDistanceMeters(selected.geometry, segmentIndex, t);
-
       const speed = newFix.speed ?? null;
       const totalDist = selected.summary.distanceMeters;
       const totalDur = selected.summary.durationSeconds;
@@ -365,7 +466,6 @@ export default function MapScreen() {
 
       etaSec = Math.max(0, etaSec);
 
-      // Next instruction + distance to next maneuver
       const traveled = Math.max(0, totalDist - rem);
       let acc = 0;
       let idx = 0;
@@ -379,7 +479,6 @@ export default function MapScreen() {
       const distToNext = Math.max(0, acc - traveled);
       const instr = selected.steps[idx]?.instruction ?? null;
 
-      // --- Gating pour les métriques UI + nav.update
       const METRICS_MIN_INTERVAL_MS = 350;
       const shouldUpdateMetrics =
         lastMetricsUpdateAtRef.current === 0 ||
@@ -390,6 +489,7 @@ export default function MapScreen() {
 
         setDistanceToRoute(distance);
         setRemainingDistance(rem);
+        remainingDistanceRef.current = rem;
         setRemainingDuration(etaSec);
 
         nav.update({
@@ -401,51 +501,39 @@ export default function MapScreen() {
           distanceToNextManeuver: distToNext,
         });
 
-        // 🔍 Dynamic zoom calculé à partir de la vitesse + contexte
         let targetZoom = 16;
-
         if (typeof speed === "number" && speed > 0.5 && speed < 20) {
           const kmh = speed * 3.6;
-
-          if (kmh < 8) targetZoom = 17.2; // très lent / pause -> zoom fort
-          else if (kmh < 15) targetZoom = 16.6; // balade tranquille
-          else if (kmh < 25) targetZoom = 15.8; // rythme soutenu
-          else targetZoom = 15.2; // très rapide -> on dézoome un peu
+          if (kmh < 8) targetZoom = 17.2;
+          else if (kmh < 15) targetZoom = 16.6;
+          else if (kmh < 25) targetZoom = 15.8;
+          else targetZoom = 15.2;
         } else {
-          // no speed: départ / GPS poor
           targetZoom = 16.8;
         }
 
-        // contexte manœuvre : on zoome un peu plus proche du prochain virage
         if (distToNext < 60) targetZoom += 0.6;
         else if (distToNext < 120) targetZoom += 0.3;
 
-        // bornes hard pour éviter les trucs extrêmes
         targetZoom = Math.max(13.5, Math.min(18, targetZoom));
-
-        // lissage (interpolation) pour éviter les sauts
         const SMOOTH = 0.25;
         setMapZoom((prev) => prev + (targetZoom - prev) * SMOOTH);
       }
 
-      // Off-route entered => vibrate + notif (throttled)
       if (isOff && !wasOff) {
         offRouteRef.current = true;
-
         const now = Date.now();
         if (now - lastOffRouteBuzzAtRef.current > 6000) {
           lastOffRouteBuzzAtRef.current = now;
           try {
-            await Haptics.notification({ type: NotificationType.Warning });
-          } catch {
-            /* noop */
-          }
+            void Haptics.notification({ type: NotificationType.Warning });
+          } catch {}
         }
 
         if (now - lastOffRouteNotifAtRef.current > 15000) {
           lastOffRouteNotifAtRef.current = now;
           try {
-            await LocalNotifications.schedule({
+            void LocalNotifications.schedule({
               notifications: [
                 {
                   id: 101,
@@ -455,44 +543,39 @@ export default function MapScreen() {
                 },
               ],
             });
-          } catch {
-            /* noop */
-          }
+          } catch {}
         }
       }
 
-      // Off-route resolved
       if (!isOff && wasOff) {
         offRouteRef.current = false;
       }
 
-      // Instruction changed => small haptic (throttled)
       if (instr && instr !== lastInstrRef.current && distToNext <= 250) {
         const now = Date.now();
         if (now - lastInstrBuzzAtRef.current > 3500) {
           lastInstrBuzzAtRef.current = now;
           lastInstrRef.current = instr;
           try {
-            await Haptics.impact({ style: ImpactStyle.Light });
-          } catch {
-            /* noop */
-          }
+            void Haptics.impact({ style: ImpactStyle.Light });
+          } catch {}
         }
       }
 
-      // Arrivé
       if (rem < 25) {
         if (navStartAtRef.current != null) {
           const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
           setNavActualDurationSec(elapsedSec);
+          if (selected) {
+            useStatsStore.getState().addRide(selected.summary.distanceMeters, elapsedSec);
+          }
+          navStartAtRef.current = null;
         }
         setHasArrived(true);
-
         stopNavigation();
         return;
       }
 
-      // Reroute (stable + accuracy)
       const ACC_OK = accGps < GPS_MAX_ACC_FOR_REROUTE;
       const COOLDOWN_MS = 12000;
 
@@ -505,13 +588,12 @@ export default function MapScreen() {
       if (offRouteStreakRef.current >= 2 && canReroute && destination) {
         lastRerouteAtRef.current = now;
         offRouteStreakRef.current = 0;
-
-        // 👉 toast UX: nouvel itinéraire calculé
         setRerouteBannerLabel(destination.label);
-
-        await calculateTo(destination);
+        void calculateTo(destination);
       }
     });
+
+    stopWatchRef.current = stopWatch;
   }, [destination, selected, fix, nav, setFix, calculateTo, stopNavigation]);
 
   // 🔁 Restauration d'une session de nav persistée
@@ -530,13 +612,11 @@ export default function MapScreen() {
 
     void (async () => {
       await calculateTo(dest);
-      const selectedNow = useRoutingStore.getState().selected();
-      if (selectedNow && !useNavigationStore.getState().isNavigating) {
-        startNavigation();
+      if (useRoutingStore.getState().selected()) {
         setResumeBannerLabel(dest.label);
       }
     })();
-  }, [fix, calculateTo, startNavigation]);
+  }, [fix, calculateTo]);
 
   // Auto-hide du toast "navigation reprise"
   useEffect(() => {
@@ -562,23 +642,7 @@ export default function MapScreen() {
     });
   }, [isNavigating]);
 
-    // Auto-start navigation quand autoRouting est actif
-  useEffect(() => {
-    if (!pendingAutoStartRef.current) return;
-    if (routing.loading) return;
-    if (!destination || !selected || !fix) return;
-    if (isNavigating) {
-      // déjà en nav (ou user a démarré à la main)
-      pendingAutoStartRef.current = false;
-      return;
-    }
-
-    pendingAutoStartRef.current = false;
-    startNavigation();
-  }, [routing.loading, destination, selected, fix, isNavigating, startNavigation]);
-
-
-  const showResults = results.length > 0 && !isNavigating;
+  const showResults = results.length > 0 && !isNavigating && sheetY < 100;
 
   const BOTTOM_EXTRA_PX = -60;
 
@@ -598,8 +662,9 @@ export default function MapScreen() {
       {/* MAP */}
       <div className="absolute inset-0">
         {fix ? (
-          <MapView
+        <MapView
             center={fix}
+            onMapClick={handleMapClick}
             heading={fix.heading ?? null}
             followUser={isNavigating && navFollowUser}
             onUserGesture={handleUserGesture}
@@ -607,7 +672,14 @@ export default function MapScreen() {
             selectedRoute={selected?.geometry ?? null}
             alternativeRoutes={altRoutes}
             zoom={mapZoom}
+            hazards={hazards}
+            parkings={parkings}
+            hazardsVisible={showHazards}
+            parkingsVisible={showParkings}
           />
+
+          
+
         ) : (
           <div className="h-full w-full flex items-center justify-center">
             <p className="text-sm text-zinc-400">Chargement de la localisation…</p>
@@ -616,7 +688,7 @@ export default function MapScreen() {
       </div>
 
       {/* TOP OVERLAY */}
-      <div className="absolute left-0 right-0 top-0 z-10 p-3 pt-4 space-y-2">
+<div className="absolute left-0 right-0 top-0 z-40 p-3 pt-4 space-y-2">
         <div className="mx-auto max-w-xl space-y-2">
           {/* Toast de reprise de navigation */}
           {resumeBannerLabel && (
@@ -636,6 +708,17 @@ export default function MapScreen() {
                 OK
               </button>
             </div>
+          )}
+
+          {/* Home button when navigating (pause) */}
+          {isNavigating && (
+            <button
+              onClick={() => navigate("/")}
+              className="absolute top-3 right-3 z-20 rounded-full bg-black/50 p-2 text-white"
+              title="Accueil (pause)"
+            >
+              🏠
+            </button>
           )}
 
           {/* Toast reroute automatique */}
@@ -663,7 +746,10 @@ export default function MapScreen() {
           {/* 🧼 En mode navigation, on masque le panneau de recherche pour libérer la carte */}
           {!isNavigating && (
             <>
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 backdrop-blur px-3 py-2 shadow-lg">
+              <motion.div
+              animate={{ opacity: sheetY === 150 ? 0 : 1, y: sheetY === 150 ? -20 : 0 }}
+              style={{ pointerEvents: sheetY === 150 ? "none" : "auto" }}
+              className="rounded-2xl border border-zinc-800 bg-zinc-950/70 backdrop-blur px-3 py-2 shadow-lg">
                 <div className="flex items-center gap-2">
                   <div className="text-xs text-zinc-400 shrink-0">Destination</div>
 
@@ -738,10 +824,10 @@ export default function MapScreen() {
                     Permission localisation: <span className="text-zinc-200">{permission}</span>
                   </div>
                 )}
-              </div>
+              </motion.div>
 
               {showResults && (
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 backdrop-blur shadow-lg overflow-hidden">
+                <div className="relative z-50 rounded-2xl border border-zinc-800 bg-zinc-950/80 backdrop-blur shadow-lg overflow-hidden max-h-64 overflow-y-auto touch-pan-y">
                   {results.slice(0, 6).map((r) => (
                     <div key={r.id} className="px-3 py-2 border-b border-zinc-900 last:border-b-0">
                       <div className="text-sm text-zinc-100">{r.label}</div>
@@ -762,15 +848,26 @@ export default function MapScreen() {
         </div>
       </div>
 
-      {/* BOTTOM SHEET */}
-      <div
-        className="absolute left-0 right-0 z-30 p-3"
+      {/* BOTTOM SHEET COULISSANTE */}
+      <motion.div
+        className="absolute left-0 right-0 z-30 p-3 touch-none"
+        animate={{ y: sheetY }}
+        drag="y"
+        dragConstraints={{ top: -150, bottom: 150 }}
+        onDragEnd={(_e: unknown, info: PanInfo) => {
+          const newY = sheetY + info.offset.y;
+          if (newY < -75) setSheetY(-150);
+          else if (newY > 75) setSheetY(150);
+          else setSheetY(0);
+        }}
         style={{
           bottom: `calc(var(--bottom-nav-h, 72px) + 12px + ${BOTTOM_EXTRA_PX}px)`,
         }}
       >
         <div className="mx-auto max-w-xl">
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 backdrop-blur shadow-lg p-3 space-y-3">
+            {/* ➖ Petite poignée visuelle pour glisser */}
+            <div className="w-12 h-1.5 bg-zinc-700/60 rounded-full mx-auto mb-2 cursor-grab active:cursor-grabbing" />
             {/* Panneau d'arrivée */}
             {hasArrived && (
               <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-3 text-xs text-emerald-50 flex items-start justify-between gap-3">
@@ -825,100 +922,36 @@ export default function MapScreen() {
               </div>
             </div>
 
-            {/* Polished toggles */}
-            <div className="grid grid-cols-2 gap-2">
-              {/* Auto-route */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={autoRouting}
-                disabled={isNavigating}
-                onClick={() => setAutoRouting((v) => !v)}
-                className={[
-                  "h-[68px] w-full relative flex items-center justify-between gap-3 rounded-2xl border px-4 transition select-none",
-                  isNavigating
-                    ? "cursor-not-allowed opacity-50 border-zinc-800 bg-zinc-950/40"
-                    : autoRouting
-                      ? "border-sky-500/40 bg-sky-500/10 hover:bg-sky-500/15"
-                      : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900/60",
-                ].join(" ")}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className={autoRouting ? "text-sky-200" : "text-zinc-300"}>🧭</span>
-                  <div className="min-w-0 leading-none">
-                    <div
-                      className={autoRouting ? "text-sky-100" : "text-zinc-100"}
-                      style={{ fontSize: 12, fontWeight: 700 }}
-                    >
-                      Auto-route
-                    </div>
-                    <div className="mt-1 text-[11px] text-zinc-400 truncate">Calcule à la sélection</div>
-                  </div>
-                </div>
-
-                <div className="shrink-0">
-                  <div
-                    className={[
-                      "relative h-7 w-12 rounded-full border transition",
-                      autoRouting ? "border-sky-400/50 bg-sky-400/25" : "border-zinc-700 bg-zinc-900/60",
-                    ].join(" ")}
-                  >
-                    <span
-                      className={[
-                        "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full shadow-sm transition-all",
-                        autoRouting ? "left-[22px] bg-sky-200" : "left-[2px] bg-zinc-200",
-                      ].join(" ")}
-                    />
-                  </div>
-                </div>
-              </button>
-
-              {/* Suivre */}
-              <button
-                type="button"
-                role="switch"
-                aria-checked={navFollowUser}
-                disabled={!isNavigating}
-                onClick={() => nav.setFollowUser(!navFollowUser)}
-                className={[
-                  "h-[68px] w-full relative flex items-center justify-between gap-3 rounded-2xl border px-4 transition select-none",
-                  !isNavigating
-                    ? "cursor-not-allowed opacity-50 border-zinc-800 bg-zinc-950/40"
-                    : navFollowUser
-                      ? "border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/15"
-                      : "border-zinc-800 bg-zinc-950/60 hover:bg-zinc-900/60",
-                ].join(" ")}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className={navFollowUser ? "text-emerald-200" : "text-zinc-300"}>🎯</span>
-                  <div className="min-w-0 leading-none">
-                    <div
-                      className={navFollowUser ? "text-emerald-100" : "text-zinc-100"}
-                      style={{ fontSize: 12, fontWeight: 700 }}
-                    >
-                      Suivre
-                    </div>
-                    <div className="mt-1 text-[11px] text-zinc-400 truncate">Caméra sur toi</div>
-                  </div>
-                </div>
-
-                <div className="shrink-0">
-                  <div
-                    className={[
-                      "relative h-7 w-12 rounded-full border transition",
-                      navFollowUser ? "border-emerald-400/50 bg-emerald-400/25" : "border-zinc-700 bg-zinc-900/60",
-                    ].join(" ")}
-                  >
-                    <span
-                      className={[
-                        "absolute top-1/2 -translate-y-1/2 h-6 w-6 rounded-full shadow-sm transition-all",
-                        navFollowUser ? "left-[22px] bg-emerald-200" : "left-[2px] bg-zinc-200",
-                      ].join(" ")}
-                    />
-                  </div>
-                </div>
-              </button>
-            </div>
+{/* Floating controls to mimic previous minimal UI */}
+              <div className="absolute bottom-28 right-4 flex flex-col gap-2 z-20">
+                <button
+                  type="button"
+                  onClick={() => nav.setFollowUser(!navFollowUser)}
+                  disabled={!isNavigating}
+                  title="Caméra suivante"
+                  className={[
+                    "h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition",
+                    !isNavigating
+                      ? "opacity-50 cursor-not-allowed bg-zinc-900"
+                      : navFollowUser
+                        ? "bg-emerald-500"
+                        : "bg-zinc-800",
+                  ].join(" ")}
+                >
+                  🎯
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAvoidHighways((v) => !v)}
+                  title="Éviter autoroutes"
+                  className={[
+                    "h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition",
+                    avoidHighways ? "bg-amber-500" : "bg-zinc-800",
+                  ].join(" ")}
+                >
+                  ⛔
+                </button>
+              </div>
 
             {/* ACTIONS */}
             <div className="flex gap-2">
@@ -1016,7 +1049,7 @@ export default function MapScreen() {
             )}
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { RouteCandidate, RouteRequest } from "../types/routing";
 import { getSecureRoute } from "../services/mapbox/directions";
 
@@ -10,7 +11,7 @@ type RoutingState = {
   candidates: RouteCandidate[];
   selectedId: string | null;
 
-  // anti résultats “en retard”
+  // anti résultats "en retard"
   activeRequestId: number;
 
   selected: () => RouteCandidate | null;
@@ -20,57 +21,70 @@ type RoutingState = {
   clear: () => void;
 };
 
-export const useRoutingStore = create<RoutingState>((set, get) => ({
-  loading: false,
-  error: null,
-
-  request: null,
-  candidates: [],
-  selectedId: null,
-
-  activeRequestId: 0,
-
-  selected: () => {
-    const { candidates, selectedId } = get();
-    return candidates.find((c) => c.id === selectedId) ?? null;
-  },
-
-  calculate: async (req, opts) => {
-    const requestId = get().activeRequestId + 1;
-
-    set({
-      loading: true,
+export const useRoutingStore = create<RoutingState>()(
+  persist(
+    (set, get) => ({
+      loading: false,
       error: null,
-      request: req,
-      activeRequestId: requestId,
-    });
 
-    try {
-      const res = await getSecureRoute(req, { signal: opts?.signal });
+      request: null,
+      candidates: [],
+      selectedId: null,
 
-      // Si un autre calculate() a démarré après, on ignore ce résultat
-      if (get().activeRequestId !== requestId) return;
+      activeRequestId: 0,
 
-      set({
-        candidates: res.all,
-        selectedId: res.best.id,
-      });
-    } catch (e: unknown) {
-      const maybe = e as { name?: string } | null;
+      selected: () => {
+        const { candidates, selectedId } = get();
+        return candidates.find((c) => c.id === selectedId) ?? null;
+      },
 
-      // Abort: pas une “vraie erreur” UI
-      if (maybe?.name === "AbortError") return;
+      calculate: async (req, opts) => {
+        const requestId = get().activeRequestId + 1;
 
-      if (get().activeRequestId !== requestId) return;
+        set({
+          loading: true,
+          error: null,
+          request: req,
+          activeRequestId: requestId,
+        });
 
-      set({ error: e instanceof Error ? e.message : "Erreur routing inconnue" });
-    } finally {
-      if (get().activeRequestId === requestId) {
-        set({ loading: false });
-      }
+        try {
+          const res = await getSecureRoute(req, { signal: opts?.signal });
+
+          // Si un autre calculate() a démarré après, on ignore ce résultat
+          if (get().activeRequestId !== requestId) return;
+
+          set({
+            candidates: res.all,
+            selectedId: res.best.id,
+          });
+        } catch (e: unknown) {
+          const maybe = e as { name?: string } | null;
+
+          // Abort: pas une "vraie erreur" UI
+          if (maybe?.name === "AbortError") return;
+
+          if (get().activeRequestId !== requestId) return;
+
+          set({ error: e instanceof Error ? e.message : "Erreur routing inconnue" });
+        } finally {
+          if (get().activeRequestId === requestId) {
+            set({ loading: false });
+          }
+        }
+      },
+
+      select: (id) => set({ selectedId: id }),
+      clear: () => set({ candidates: [], selectedId: null, error: null }),
+    }),
+    {
+      name: "routing-store",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        request: state.request,
+        candidates: state.candidates,
+        selectedId: state.selectedId,
+      }),
     }
-  },
-
-  select: (id) => set({ selectedId: id }),
-  clear: () => set({ candidates: [], selectedId: null, error: null }),
-}));
+  )
+);

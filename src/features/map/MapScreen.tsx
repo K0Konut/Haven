@@ -26,6 +26,8 @@ import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { loadNavSession, saveNavSession } from "../../services/navigation/persistence";
 import { useStatsStore } from "../../store/stats.slice";
+import { motion } from "framer-motion";
+
 
 type SelectedDestination = { label: string; center: LatLng };
 
@@ -61,7 +63,7 @@ export default function MapScreen() {
   const nav = useNavigationStore();
   const isNavigating = useNavigationStore((s) => s.isNavigating);
   const navFollowUser = useNavigationStore((s) => s.followUser);
-
+  const [sheetY, setSheetY] = useState(0);
   const [destination, setDestination] = useState<SelectedDestination | null>(null);
 
   // Search UI
@@ -171,7 +173,7 @@ export default function MapScreen() {
     })();
   }, []);
 
-  // Init permission + first fix
+  // Init permission + suivi temps réel au démarrage
   useEffect(() => {
     (async () => {
       try {
@@ -179,8 +181,15 @@ export default function MapScreen() {
         const perm = await ensureLocationPermission();
         setPermission(perm);
 
-        const pos = await getCurrentPosition();
-        setFix(pos);
+        if (perm === 'granted') {
+          // On utilise ton watchPosition local
+          const stopWatch = watchPosition((pos) => {
+            setFix(pos);
+          });
+          
+          stopWatchRef.current = stopWatch;
+        }
+
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erreur inconnue");
       }
@@ -212,10 +221,32 @@ export default function MapScreen() {
     try {
       setSearchError(null);
       setSearchLoading(true);
-      const r = await geocodeForward(query, fix ? { lat: fix.lat, lng: fix.lng } : undefined);
-      setResults(r);
+      
+      let url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lang=fr&limit=6`;
+      if (fix) {
+        url += `&lat=${fix.lat}&lon=${fix.lng}`;
+      }
+
+      const response = await fetch(url);
+      const data = await response.json();
+
+      const formatted: PlaceResult[] = data.features.map((f: any) => ({
+        id: f.properties.osm_id?.toString() || Math.random().toString(),
+        label: [
+          f.properties.name,
+          f.properties.housenumber,
+          f.properties.street,
+          f.properties.city
+        ].filter(Boolean).join(", "),
+        center: { 
+          lng: f.geometry.coordinates[0], 
+          lat: f.geometry.coordinates[1] 
+        }
+      }));
+
+      setResults(formatted);
     } catch (e) {
-      setSearchError(e instanceof Error ? e.message : "Erreur recherche");
+      setSearchError("Erreur lors de la recherche");
     } finally {
       setSearchLoading(false);
     }
@@ -223,10 +254,13 @@ export default function MapScreen() {
 
   // Debounced autocomplete
   useEffect(() => {
+    if (destination && q === destination.label) {
+      setResults([]);
+      return;
+    }
     const t = setTimeout(() => void runSearch(), 350);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, fix]);
+  }, [q, destination]);
 
   const calculateTo = useCallback(
     async (dest: SelectedDestination) => {
@@ -262,6 +296,36 @@ export default function MapScreen() {
       void calculateTo(dest);
     } else {
       routing.clear();
+    }
+  }
+
+  async function handleMapClick(coords: LatLng) {
+    if (isNavigating) return; 
+
+    try {
+      setSearchLoading(true);
+      const res = await fetch(`https://photon.komoot.io/reverse?lon=${coords.lng}&lat=${coords.lat}&lang=fr`);
+      const data = await res.json();
+
+      let label = "Point sur la carte";
+      let id = Math.random().toString();
+
+      if (data.features && data.features.length > 0) {
+        const f = data.features[0];
+        id = f.properties.osm_id?.toString() || id;
+        label = [
+          f.properties.name,
+          f.properties.housenumber,
+          f.properties.street,
+          f.properties.city
+        ].filter(Boolean).join(", ") || label;
+      }
+
+      setAsDestination({ id, label, center: coords });
+    } catch (e) {
+      setAsDestination({ id: Math.random().toString(), label: "Point sur la carte", center: coords });
+    } finally {
+      setSearchLoading(false);
     }
   }
 
@@ -304,7 +368,7 @@ export default function MapScreen() {
     setMapZoom(16);
 
     // revenir à l'accueil après arrêt
-    navigate("/");
+    //navigate("/");
   }, [nav, navigate]);
 
   function clearDestination() {
@@ -330,32 +394,28 @@ export default function MapScreen() {
   const startNavigation = useCallback(() => {
     if (!destination || !selected || !fix) return;
 
-    nav.start(); // followUser = true dans le store
+    nav.start();
 
-    // départ de session nav
     navStartAtRef.current = Date.now();
     setHasArrived(false);
     setNavActualDurationSec(null);
 
-    // persiste la session de nav
     saveNavSession({
       version: 1,
       savedAt: Date.now(),
       destination,
     });
 
-    // reset feedback guards
     offRouteRef.current = false;
     lastInstrRef.current = null;
-
     offRouteStreakRef.current = 0;
     lastRerouteAtRef.current = 0;
 
     stopWatchRef.current?.();
-    stopWatchRef.current = watchPosition(async (newFix) => {
+
+    const stopWatch = watchPosition((newFix) => {
       const nowTs = Date.now();
 
-      // --- Gating simple pour l'update du store location (setFix)
       const FIX_MIN_INTERVAL_MS = 220;
       const shouldUpdateFix =
         lastFixUpdateAtRef.current === 0 ||
@@ -369,7 +429,6 @@ export default function MapScreen() {
       if (!selected) return;
 
       const accGps = newFix.accuracy ?? 999;
-
       const { routeSegIndex } = useNavigationStore.getState();
 
       const snap = distanceToRouteMeters(newFix, selected.geometry, {
@@ -378,7 +437,6 @@ export default function MapScreen() {
         fallbackToFullScan: accGps > GPS_MAX_ACC_FOR_SNAP ? false : true,
       });
 
-      // store progress for next tick (seulement si GPS correct)
       if (accGps <= GPS_MAX_ACC_FOR_SNAP) {
         nav.setRouteProgress(snap.segmentIndex, snap.t);
       }
@@ -387,12 +445,10 @@ export default function MapScreen() {
       const segmentIndex = snap.segmentIndex;
       const t = snap.t;
 
-      // OFF-ROUTE hystérésis + garde-fou accuracy
       const OFF_ROUTE_ENTER = 40;
       const OFF_ROUTE_EXIT = 28;
 
       const wasOff = offRouteRef.current;
-
       let isOff = wasOff;
       if (accGps <= GPS_MAX_ACC_FOR_OFFROUTE) {
         isOff = wasOff ? distance > OFF_ROUTE_EXIT : distance > OFF_ROUTE_ENTER;
@@ -401,7 +457,6 @@ export default function MapScreen() {
       nav.setOffRoute(isOff);
 
       const rem = remainingRouteDistanceMeters(selected.geometry, segmentIndex, t);
-
       const speed = newFix.speed ?? null;
       const totalDist = selected.summary.distanceMeters;
       const totalDur = selected.summary.durationSeconds;
@@ -412,7 +467,6 @@ export default function MapScreen() {
 
       etaSec = Math.max(0, etaSec);
 
-      // Next instruction + distance to next maneuver
       const traveled = Math.max(0, totalDist - rem);
       let acc = 0;
       let idx = 0;
@@ -426,7 +480,6 @@ export default function MapScreen() {
       const distToNext = Math.max(0, acc - traveled);
       const instr = selected.steps[idx]?.instruction ?? null;
 
-      // --- Gating pour les métriques UI + nav.update
       const METRICS_MIN_INTERVAL_MS = 350;
       const shouldUpdateMetrics =
         lastMetricsUpdateAtRef.current === 0 ||
@@ -449,51 +502,39 @@ export default function MapScreen() {
           distanceToNextManeuver: distToNext,
         });
 
-        // 🔍 Dynamic zoom calculé à partir de la vitesse + contexte
         let targetZoom = 16;
-
         if (typeof speed === "number" && speed > 0.5 && speed < 20) {
           const kmh = speed * 3.6;
-
-          if (kmh < 8) targetZoom = 17.2; // très lent / pause -> zoom fort
-          else if (kmh < 15) targetZoom = 16.6; // balade tranquille
-          else if (kmh < 25) targetZoom = 15.8; // rythme soutenu
-          else targetZoom = 15.2; // très rapide -> on dézoome un peu
+          if (kmh < 8) targetZoom = 17.2;
+          else if (kmh < 15) targetZoom = 16.6;
+          else if (kmh < 25) targetZoom = 15.8;
+          else targetZoom = 15.2;
         } else {
-          // no speed: départ / GPS poor
           targetZoom = 16.8;
         }
 
-        // contexte manœuvre : on zoome un peu plus proche du prochain virage
         if (distToNext < 60) targetZoom += 0.6;
         else if (distToNext < 120) targetZoom += 0.3;
 
-        // bornes hard pour éviter les trucs extrêmes
         targetZoom = Math.max(13.5, Math.min(18, targetZoom));
-
-        // lissage (interpolation) pour éviter les sauts
         const SMOOTH = 0.25;
         setMapZoom((prev) => prev + (targetZoom - prev) * SMOOTH);
       }
 
-      // Off-route entered => vibrate + notif (throttled)
       if (isOff && !wasOff) {
         offRouteRef.current = true;
-
         const now = Date.now();
         if (now - lastOffRouteBuzzAtRef.current > 6000) {
           lastOffRouteBuzzAtRef.current = now;
           try {
-            await Haptics.notification({ type: NotificationType.Warning });
-          } catch {
-            /* noop */
-          }
+            void Haptics.notification({ type: NotificationType.Warning });
+          } catch {}
         }
 
         if (now - lastOffRouteNotifAtRef.current > 15000) {
           lastOffRouteNotifAtRef.current = now;
           try {
-            await LocalNotifications.schedule({
+            void LocalNotifications.schedule({
               notifications: [
                 {
                   id: 101,
@@ -503,32 +544,25 @@ export default function MapScreen() {
                 },
               ],
             });
-          } catch {
-            /* noop */
-          }
+          } catch {}
         }
       }
 
-      // Off-route resolved
       if (!isOff && wasOff) {
         offRouteRef.current = false;
       }
 
-      // Instruction changed => small haptic (throttled)
       if (instr && instr !== lastInstrRef.current && distToNext <= 250) {
         const now = Date.now();
         if (now - lastInstrBuzzAtRef.current > 3500) {
           lastInstrBuzzAtRef.current = now;
           lastInstrRef.current = instr;
           try {
-            await Haptics.impact({ style: ImpactStyle.Light });
-          } catch {
-            /* noop */
-          }
+            void Haptics.impact({ style: ImpactStyle.Light });
+          } catch {}
         }
       }
 
-      // Arrivé
       if (rem < 25) {
         if (navStartAtRef.current != null) {
           const elapsedSec = (Date.now() - navStartAtRef.current) / 1000;
@@ -536,15 +570,13 @@ export default function MapScreen() {
           if (selected) {
             useStatsStore.getState().addRide(selected.summary.distanceMeters, elapsedSec);
           }
-          navStartAtRef.current = null; // évite double-comptage dans stopNavigation
+          navStartAtRef.current = null;
         }
         setHasArrived(true);
-
         stopNavigation();
         return;
       }
 
-      // Reroute (stable + accuracy)
       const ACC_OK = accGps < GPS_MAX_ACC_FOR_REROUTE;
       const COOLDOWN_MS = 12000;
 
@@ -557,13 +589,12 @@ export default function MapScreen() {
       if (offRouteStreakRef.current >= 2 && canReroute && destination) {
         lastRerouteAtRef.current = now;
         offRouteStreakRef.current = 0;
-
-        // 👉 toast UX: nouvel itinéraire calculé
         setRerouteBannerLabel(destination.label);
-
-        await calculateTo(destination);
+        void calculateTo(destination);
       }
     });
+
+    stopWatchRef.current = stopWatch;
   }, [destination, selected, fix, nav, setFix, calculateTo, stopNavigation]);
 
   // 🔁 Restauration d'une session de nav persistée
@@ -612,7 +643,7 @@ export default function MapScreen() {
     });
   }, [isNavigating]);
 
-  const showResults = results.length > 0 && !isNavigating;
+  const showResults = results.length > 0 && !isNavigating && sheetY < 100;
 
   const BOTTOM_EXTRA_PX = -60;
 
@@ -632,8 +663,9 @@ export default function MapScreen() {
       {/* MAP */}
       <div className="absolute inset-0">
         {fix ? (
-          <MapView
+        <MapView
             center={fix}
+            onMapClick={handleMapClick}
             heading={fix.heading ?? null}
             followUser={isNavigating && navFollowUser}
             onUserGesture={handleUserGesture}
@@ -641,12 +673,14 @@ export default function MapScreen() {
             selectedRoute={selected?.geometry ?? null}
             alternativeRoutes={altRoutes}
             zoom={mapZoom}
-
             hazards={hazards}
             parkings={parkings}
             hazardsVisible={showHazards}
             parkingsVisible={showParkings}
           />
+
+          
+
         ) : (
           <div className="h-full w-full flex items-center justify-center">
             <p className="text-sm text-zinc-400">Chargement de la localisation…</p>
@@ -713,7 +747,10 @@ export default function MapScreen() {
           {/* 🧼 En mode navigation, on masque le panneau de recherche pour libérer la carte */}
           {!isNavigating && (
             <>
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 backdrop-blur px-3 py-2 shadow-lg">
+              <motion.div
+              animate={{ opacity: sheetY === 150 ? 0 : 1, y: sheetY === 150 ? -20 : 0 }}
+              style={{ pointerEvents: sheetY === 150 ? "none" : "auto" }}
+              className="rounded-2xl border border-zinc-800 bg-zinc-950/70 backdrop-blur px-3 py-2 shadow-lg">
                 <div className="flex items-center gap-2">
                   <div className="text-xs text-zinc-400 shrink-0">Destination</div>
 
@@ -788,10 +825,10 @@ export default function MapScreen() {
                     Permission localisation: <span className="text-zinc-200">{permission}</span>
                   </div>
                 )}
-              </div>
+              </motion.div>
 
               {showResults && (
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 backdrop-blur shadow-lg overflow-hidden max-h-64 overflow-y-auto touch-pan-y">
+                <div className="relative z-50 rounded-2xl border border-zinc-800 bg-zinc-950/80 backdrop-blur shadow-lg overflow-hidden max-h-64 overflow-y-auto touch-pan-y">
                   {results.slice(0, 6).map((r) => (
                     <div key={r.id} className="px-3 py-2 border-b border-zinc-900 last:border-b-0">
                       <div className="text-sm text-zinc-100">{r.label}</div>
@@ -812,15 +849,26 @@ export default function MapScreen() {
         </div>
       </div>
 
-      {/* BOTTOM SHEET */}
-      <div
-        className="absolute left-0 right-0 z-30 p-3"
+      {/* BOTTOM SHEET COULISSANTE */}
+      <motion.div
+        className="absolute left-0 right-0 z-30 p-3 touch-none"
+        animate={{ y: sheetY }}
+        drag="y"
+        dragConstraints={{ top: -150, bottom: 150 }}
+        onDragEnd={(_e: any, info) => {
+          const newY = sheetY + info.offset.y;
+          if (newY < -75) setSheetY(-150);
+          else if (newY > 75) setSheetY(150);
+          else setSheetY(0);
+        }}
         style={{
           bottom: `calc(var(--bottom-nav-h, 72px) + 12px + ${BOTTOM_EXTRA_PX}px)`,
         }}
       >
         <div className="mx-auto max-w-xl">
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 backdrop-blur shadow-lg p-3 space-y-3">
+            {/* ➖ Petite poignée visuelle pour glisser */}
+            <div className="w-12 h-1.5 bg-zinc-700/60 rounded-full mx-auto mb-2 cursor-grab active:cursor-grabbing" />
             {/* Panneau d'arrivée */}
             {hasArrived && (
               <div className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-3 text-xs text-emerald-50 flex items-start justify-between gap-3">
@@ -1002,7 +1050,7 @@ export default function MapScreen() {
             )}
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

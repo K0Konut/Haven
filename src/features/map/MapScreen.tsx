@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ensureLocationPermission,
-  getCurrentPosition,
   watchPosition,
 } from "../../services/permissions/location";
 import { useLocationStore } from "../../store/location.slice";
@@ -11,7 +10,7 @@ import { useNavigationStore } from "../../store/navigation.slice";
 import MapView from "./MapView";
 import NavBanner from "./components/NavBanner";
 import { formatDistance, formatDuration } from "../../services/routing/format";
-import { geocodeForward, type PlaceResult } from "../../services/mapbox/geocoding";
+import { type PlaceResult } from "../../services/mapbox/geocoding";
 import type { LatLng } from "../../types/routing";
 import type { Hazard, ParkingSpot } from "../../types/map";
 import { fetchHazards } from "../../services/map/hazards";
@@ -26,7 +25,7 @@ import { Haptics, NotificationType, ImpactStyle } from "@capacitor/haptics";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { loadNavSession, saveNavSession } from "../../services/navigation/persistence";
 import { useStatsStore } from "../../store/stats.slice";
-import { motion } from "framer-motion";
+import { motion, type PanInfo } from "framer-motion";
 
 
 type SelectedDestination = { label: string; center: LatLng };
@@ -855,7 +854,7 @@ export default function MapScreen() {
         animate={{ y: sheetY }}
         drag="y"
         dragConstraints={{ top: -150, bottom: 150 }}
-        onDragEnd={(_e: any, info) => {
+        onDragEnd={(_e: unknown, info: PanInfo) => {
           const newY = sheetY + info.offset.y;
           if (newY < -75) setSheetY(-150);
           else if (newY > 75) setSheetY(150);
